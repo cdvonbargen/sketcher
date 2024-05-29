@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest]
+        os: [macos-latest, ubuntu-latest]
         build-output: [app]
 
     steps:
@@ -89,6 +89,10 @@ jobs:
           library: rdkit
           version: ${{ fromJson(env.VERSIONS_JSON).rdkit }}
           build-output: ${{ matrix.build-output }}
+
+      - name: Install random
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt install libxcb-cursor-dev
 
       - name: Fetch Qt
         id: fetch-qt
