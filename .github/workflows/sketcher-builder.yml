@@ -28,9 +28,11 @@ jobs:
       - name: Create and activate virtualenv
         run: |
           python3 -m venv .venv
-          ls .venv
-          ls .venv/Scripts
-          source .venv/Scripts/activate
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
           echo PATH=$PATH >> $GITHUB_ENV
 
       - name: Install Python packages
