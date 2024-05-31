@@ -29,8 +29,8 @@ jobs:
         run: |
           python3 -m venv .venv
           ls .venv
-          ls .venv/bin
-          source .venv/bin/activate
+          ls .venv/Scripts
+          source .venv/Scripts/activate
           echo PATH=$PATH >> $GITHUB_ENV
 
       - name: Install Python packages
