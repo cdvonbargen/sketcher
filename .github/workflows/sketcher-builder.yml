@@ -95,36 +95,36 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt install libxcb-cursor-dev
 
-    #   - name: Fetch Qt
-    #     id: fetch-qt
-    #     uses: ./.github/actions/build-external
-    #     with:
-    #       library: qt
-    #       version: ${{ fromJson(env.VERSIONS_JSON).qt }}
-    #       build-output: ${{ matrix.build-output }}
+      - name: Fetch Qt
+        id: fetch-qt
+        uses: ./.github/actions/build-external
+        with:
+          library: qt
+          version: ${{ fromJson(env.VERSIONS_JSON).qt }}
+          build-output: ${{ matrix.build-output }}
 
-    #   - name: Configure CMake
-    #     env:
-    #         CMAKE_PREFIX_PATH: "${{ steps.fetch-fmt.outputs.path }};\
-    #                             ${{ steps.fetch-zlib.outputs.path }};\
-    #                             ${{ steps.fetch-zstd.outputs.path }};\
-    #                             ${{ steps.fetch-boost.outputs.path }};\
-    #                             ${{ steps.fetch-rdkit.outputs.path }};\
-    #                             ${{ steps.fetch-qt.outputs.path }}"
-    #     run: |
-    #       cmake -B build -S . -G Ninja \
-    #             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-    #             -DCMAKE_PREFIX_PATH="${{ env.CMAKE_PREFIX_PATH }}"
+      - name: Configure CMake
+        env:
+            CMAKE_PREFIX_PATH: "${{ steps.fetch-fmt.outputs.path }};\
+                                ${{ steps.fetch-zlib.outputs.path }};\
+                                ${{ steps.fetch-zstd.outputs.path }};\
+                                ${{ steps.fetch-boost.outputs.path }};\
+                                ${{ steps.fetch-rdkit.outputs.path }};\
+                                ${{ steps.fetch-qt.outputs.path }}"
+        run: |
+          cmake -B build -S . -G Ninja \
+                -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+                -DCMAKE_PREFIX_PATH="${{ env.CMAKE_PREFIX_PATH }}"
 
-    #   - name: Build
-    #     run: cmake --build build --config ${{ env.BUILD_TYPE }}
+      - name: Build
+        run: cmake --build build --config ${{ env.BUILD_TYPE }}
 
-    #   - name: Test
-    #     working-directory: build
-    #     run: ctest --build-config ${{ env.BUILD_TYPE }} --output-on-failure
+      - name: Test
+        working-directory: build
+        run: ctest --build-config ${{ env.BUILD_TYPE }} --output-on-failure
 
-    #   - name: Download sketcher executable
-    #     uses: actions/upload-artifact@v4
-    #     with:
-    #       name: sketcher_${{ matrix.build-output }}
-    #       path: build/sketcher_app
+      - name: Download sketcher executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: sketcher_${{ matrix.build-output }}
+          path: build/sketcher_app
