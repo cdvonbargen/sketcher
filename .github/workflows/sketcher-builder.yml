@@ -55,11 +55,13 @@ jobs:
           version: ${{ fromJson(env.VERSIONS_JSON).emscripten }}
 
       - name: Configure Dependency CMake
+        if: matrix.build-output != 'WASM'
         run: |
-            emcmake cmake -B build/external/ -S external/ -G Ninja \
+            cmake -B build/external/ -S external/ -G Ninja \
                 -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
 
       - name: Fetch fmt
+        if: matrix.build-output != 'WASM'
         id: fetch-fmt
         uses: ./.github/actions/build-external
         with:
@@ -67,6 +69,7 @@ jobs:
           version: ${{ fromJson(env.VERSIONS_JSON).fmt }}
 
       - name: Fetch zlib
+        if: matrix.build-output != 'WASM'
         id: fetch-zlib
         uses: ./.github/actions/build-external
         with:
@@ -74,6 +77,7 @@ jobs:
           version: ${{ fromJson(env.VERSIONS_JSON).zlib }}
 
       - name: Fetch zstd
+        if: matrix.build-output != 'WASM'
         id: fetch-zstd
         uses: ./.github/actions/build-external
         with:
@@ -81,6 +85,7 @@ jobs:
           version: ${{ fromJson(env.VERSIONS_JSON).zstd }}
 
       - name: Fetch Boost
+        if: matrix.build-output != 'WASM'
         id: fetch-boost
         uses: ./.github/actions/build-external
         with:
@@ -88,15 +93,12 @@ jobs:
           version: ${{ fromJson(env.VERSIONS_JSON).boost }}
 
       - name: Fetch RDKit
+        if: matrix.build-output != 'WASM'
         id: fetch-rdkit
         uses: ./.github/actions/build-external
         with:
           library: rdkit
           version: ${{ fromJson(env.VERSIONS_JSON).rdkit }}
-
-      - name: Install random
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt install libxcb-cursor-dev
 
       - name: Fetch Qt
         if: matrix.os == 'macos-latest'
