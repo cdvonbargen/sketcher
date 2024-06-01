@@ -21,7 +21,9 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
         build-output: [app]
-
+        include:
+          - os: ubuntu-latest
+            build-output: WASM
     steps:
       - uses: actions/checkout@v4
 
@@ -46,9 +48,15 @@ jobs:
               echo -e '\nEOF'
           } >> "$GITHUB_ENV"
 
+      - name: Fetch emscripten
+        if: matrix.build-output == 'WASM'
+        uses: ./.github/actions/setup_emscripten
+        with:
+          emscripten_version: ${{ fromJson(env.VERSIONS_JSON).emscripten }}
+
       - name: Configure Dependency CMake
         run: |
-            cmake -B build/external/ -S external/ -G Ninja \
+            emcmake cmake -B build/external/ -S external/ -G Ninja \
                 -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
 
       - name: Fetch fmt
@@ -96,6 +104,7 @@ jobs:
         run: sudo apt install libxcb-cursor-dev
 
       - name: Fetch Qt
+        if: matrix.os == 'macos-latest'
         id: fetch-qt
         uses: ./.github/actions/build-external
         with:
@@ -104,6 +113,7 @@ jobs:
           build-output: ${{ matrix.build-output }}
 
       - name: Configure CMake
+        if: matrix.os == 'macos-latest'
         env:
             CMAKE_PREFIX_PATH: "${{ steps.fetch-fmt.outputs.path }};\
                                 ${{ steps.fetch-zlib.outputs.path }};\
@@ -117,13 +127,16 @@ jobs:
                 -DCMAKE_PREFIX_PATH="${{ env.CMAKE_PREFIX_PATH }}"
 
       - name: Build
+        if: matrix.os == 'macos-latest'
         run: cmake --build build --config ${{ env.BUILD_TYPE }}
 
       - name: Test
+        if: matrix.os == 'macos-latest'
         working-directory: build
         run: ctest --build-config ${{ env.BUILD_TYPE }} --output-on-failure
 
       - name: Download sketcher executable
+        if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
           name: sketcher_${{ matrix.build-output }}
