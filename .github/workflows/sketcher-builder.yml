@@ -50,9 +50,9 @@ jobs:
 
       - name: Fetch emscripten
         if: matrix.build-output == 'WASM'
-        uses: ./.github/actions/setup_emscripten
+        uses: ./.github/actions/setup-emscripten
         with:
-          emscripten_version: ${{ fromJson(env.VERSIONS_JSON).emscripten }}
+          version: ${{ fromJson(env.VERSIONS_JSON).emscripten }}
 
       - name: Configure Dependency CMake
         run: |
@@ -65,7 +65,6 @@ jobs:
         with:
           library: fmt
           version: ${{ fromJson(env.VERSIONS_JSON).fmt }}
-          build-output: ${{ matrix.build-output }}
 
       - name: Fetch zlib
         id: fetch-zlib
@@ -73,7 +72,6 @@ jobs:
         with:
           library: zlib
           version: ${{ fromJson(env.VERSIONS_JSON).zlib }}
-          build-output: ${{ matrix.build-output }}
 
       - name: Fetch zstd
         id: fetch-zstd
@@ -81,7 +79,6 @@ jobs:
         with:
           library: zstd
           version: ${{ fromJson(env.VERSIONS_JSON).zstd }}
-          build-output: ${{ matrix.build-output }}
 
       - name: Fetch Boost
         id: fetch-boost
@@ -89,7 +86,6 @@ jobs:
         with:
           library: boost
           version: ${{ fromJson(env.VERSIONS_JSON).boost }}
-          build-output: ${{ matrix.build-output }}
 
       - name: Fetch RDKit
         id: fetch-rdkit
@@ -97,7 +93,6 @@ jobs:
         with:
           library: rdkit
           version: ${{ fromJson(env.VERSIONS_JSON).rdkit }}
-          build-output: ${{ matrix.build-output }}
 
       - name: Install random
         if: matrix.os == 'ubuntu-latest'
@@ -110,7 +105,6 @@ jobs:
         with:
           library: qt
           version: ${{ fromJson(env.VERSIONS_JSON).qt }}
-          build-output: ${{ matrix.build-output }}
 
       - name: Configure CMake
         if: matrix.os == 'macos-latest'
