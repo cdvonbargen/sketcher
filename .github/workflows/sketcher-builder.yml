@@ -48,9 +48,9 @@ jobs:
               echo -e '\nEOF'
           } >> "$GITHUB_ENV"
 
-      - name: Fetch emscripten
+      - name: Activate emscripten
         if: matrix.build-output == 'WASM'
-        uses: ./.github/actions/setup-emscripten
+        uses: ./.github/actions/activate-emsdk
         with:
           version: ${{ fromJson(env.VERSIONS_JSON).emscripten }}
 

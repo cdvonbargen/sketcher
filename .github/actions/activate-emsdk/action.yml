@@ -9,12 +9,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/cache@v4
-      id: cache-check
-      with:
-        path: build/external/emsdk-${{ inputs.version }}
-        key: emsdk-${{ inputs.version }}-${{ runner.os }}-${{ matrix.build-output }}
-
     - uses: actions/checkout@v4
       if: ${{ steps.cache-check.outputs.cache-hit != 'true' }}
       with:
@@ -23,7 +17,6 @@ runs:
         path: build/external/emsdk-${{ inputs.version }}/emsdk/
 
     - name: Install and activate emscripten
-      if: ${{ steps.cache-check.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
         cd build/external/emsdk-${{ inputs.version }}/emsdk/ && \
