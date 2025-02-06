@@ -9,7 +9,7 @@
 
 ## Dependencies
 
-* Qt
+* Qt6
 * RDKit
 * maeparser
 * fmt
