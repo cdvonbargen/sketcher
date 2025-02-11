@@ -37,7 +37,8 @@ function(setup_target TARGET)
   endif()
   # Allow RDKit includes to be prefixed
   target_include_directories(${TARGET} PRIVATE ${RDKit_INCLUDE_DIRS}/..
-                                               ${PROJECT_SOURCE_DIR}/include)
+                                               ${PROJECT_SOURCE_DIR}/include
+                                               ${PROJECT_SOURCE_DIR}/src/)
   # Assume use of static libraries
   target_compile_definitions(
     ${TARGET} PRIVATE RDKIT_EXTENSIONS_STATIC_DEFINE SKETCHER_STATIC_DEFINE
@@ -53,7 +54,6 @@ function(build_static_library TARGET)
        ${SRC_DIR}/*.h ${SRC_DIR}/*.cpp)
   add_library(${TARGET} STATIC ${SOURCE_LIST})
   add_library(schrodinger::${TARGET} ALIAS ${TARGET})
-  target_include_directories(${TARGET} PRIVATE ${SRC_DIR})
   setup_target(${TARGET})
 endfunction()
 
