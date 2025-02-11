@@ -53,6 +53,7 @@ function(build_static_library TARGET)
        ${SRC_DIR}/*.h ${SRC_DIR}/*.cpp)
   add_library(${TARGET} STATIC ${SOURCE_LIST})
   add_library(schrodinger::${TARGET} ALIAS ${TARGET})
+  target_include_directories(${TARGET} PRIVATE ${SRC_DIR})
   setup_target(${TARGET})
 endfunction()
 
