@@ -51,7 +51,8 @@ function(setup_target TARGET)
     target_compile_options(${TARGET} PRIVATE -Wall -Werror -Wswitch -O2 -fvisibility=hidden)
   endif()
   # Allow RDKit includes to be prefixed
-  target_include_directories(${TARGET} PRIVATE ${RDKit_INCLUDE_DIRS}/..
+  target_include_directories(${TARGET} PRIVATE ${RDKit_INCLUDE_DIRS}
+                                               ${RDKit_INCLUDE_DIRS}/..
                                                ${PROJECT_SOURCE_DIR}/include
                                                ${PROJECT_SOURCE_DIR}/src)
   # Assume use of static libraries

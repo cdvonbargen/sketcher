@@ -46,12 +46,6 @@ else()
     endif()
 endif()
 
-if(WIN32)
-    set(RDKIT_INSTALL_STATIC_LIBS_VAL ON)
-else()
-    set(RDKIT_INSTALL_STATIC_LIBS_VAL OFF)
-endif()
-
 set(COMMON_EXTERNAL_PROJECT_CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release)
 if(CMAKE_TOOLCHAIN_FILE)
     # Emscripten builds specify a toolchain file and a cross-compiling emulator
@@ -61,6 +55,7 @@ if(CMAKE_TOOLCHAIN_FILE)
     )
 endif()
 
+# Build fmt library
 ExternalProject_Add(
   fmt
   GIT_REPOSITORY https://github.com/fmtlib/fmt.git
@@ -71,6 +66,7 @@ ExternalProject_Add(
     -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/fmt-${FMT_VERSION}
     -DFMT_DOC=OFF -DFMT_TEST=OFF -DFMT_INSTALL=ON)
 
+# Build zlib library
 ExternalProject_Add(
   zlib
   GIT_REPOSITORY https://github.com/madler/zlib.git
@@ -82,6 +78,7 @@ ExternalProject_Add(
     -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/zlib-${ZLIB_VERSION}
     -DBUILD_SHARED_LIBS=OFF)
 
+# Build zstd library
 ExternalProject_Add(
   zstd
   GIT_REPOSITORY https://github.com/facebook/zstd.git
@@ -94,6 +91,7 @@ ExternalProject_Add(
     -DZSTD_BUILD_SHARED=OFF
     -DZSTD_BUILD_PROGRAMS=OFF)
 
+# Build Boost library
 set_cmake_arg(
   BOOST_INCLUDE_LIBS
   # RDKit required libraries
@@ -154,6 +152,7 @@ ExternalProject_Add_Step(boost install_beast_header_only
     COMMAND cp -rv  ${BOOST_BEAST_HEADERS_PATH} ${BOOST_INCLUDE_DIR}
 )
 
+# Build RDKit library
 string(REPLACE "." "_" RDKIT_GIT_TAG ${RDKIT_VERSION})
 set_cmake_arg(
   RDKIT_CMAKE_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/boost-${BOOST_VERSION}
@@ -168,6 +167,11 @@ else()
     # Prevent RDKit from trying to build shared libs
     list(APPEND RDKIT_PATCH_COMMAND && git apply ${CMAKE_CURRENT_SOURCE_DIR}/rdkit_static_build.patch)
     list(APPEND RDKIT_PATCH_COMMAND && git apply ${CMAKE_CURRENT_SOURCE_DIR}/rdkit_cstdint.patch)
+endif()
+if(WIN32)
+    set(RDKIT_INSTALL_STATIC_LIBS_VAL ON)
+else()
+    set(RDKIT_INSTALL_STATIC_LIBS_VAL OFF)
 endif()
 ExternalProject_Add(
   rdkit
@@ -196,6 +200,7 @@ ExternalProject_Add(
     -DRDK_USE_BOOST_STACKTRACE=OFF
     ${EXTRA_RDKIT_CMAKE_ARGS})
 
+# Build Qt library
 if(QT_HOST_BUILD)
     # For WASM builds, we also need a non-WASM build of Qt since some of the Qt
     # command line tools get run during the build process (e.g. uic, rcc, etc).
