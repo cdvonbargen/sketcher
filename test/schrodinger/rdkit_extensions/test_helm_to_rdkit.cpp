@@ -2,6 +2,8 @@
 #define BOOST_TEST_MODULE test_helm_to_rdkit
 
 #include <boost/test/data/test_case.hpp>
+#include <boost/test/unit_test.hpp>
+
 #include <fmt/format.h>
 #include <sstream>
 #include <string>
@@ -18,7 +20,6 @@
 #include "schrodinger/rdkit_extensions/helm/to_rdkit.h"
 #include "schrodinger/rdkit_extensions/helm/to_string.h"
 #include "schrodinger/rdkit_extensions/helm.h"
-#include "schrodinger/test/checkexceptionmsg.h" // TEST_CHECK_EXCEPTION_MSG_SUBSTR
 
 using namespace helm;
 

@@ -8,7 +8,7 @@
 
 #include "schrodinger/rdkit_extensions/helm/helm_parser.h"
 #include "schrodinger/rdkit_extensions/helm_examples.h"
-#include "schrodinger/test/checkexceptionmsg.h" // TEST_CHECK_EXCEPTION_MSG_SUBSTR
+#include "test_common.h"
 
 namespace bdata = boost::unit_test::data;
 

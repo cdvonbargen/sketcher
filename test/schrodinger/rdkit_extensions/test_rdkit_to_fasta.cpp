@@ -2,6 +2,7 @@
 #define BOOST_TEST_MODULE test_rdkit_to_fasta
 
 #include <boost/test/data/test_case.hpp>
+#include <boost/test/unit_test.hpp>
 #include <rdkit/GraphMol/FileParsers/SequenceParsers.h>
 #include <rdkit/GraphMol/ROMol.h>
 #include <rdkit/GraphMol/RWMol.h>
@@ -14,8 +15,7 @@
 #include "schrodinger/rdkit_extensions/fasta/to_string.h"
 #include "schrodinger/rdkit_extensions/helm/to_rdkit.h"
 #include "schrodinger/rdkit_extensions/helm/to_string.h"
-
-#include "schrodinger/test/checkexceptionmsg.h" // TEST_CHECK_EXCEPTION_MSG_SUBSTR
+#include "test_common.h"
 
 namespace bdata = boost::unit_test::data;
 

@@ -20,11 +20,9 @@
 #include "schrodinger/rdkit_extensions/cg_conversions.h"
 #include "schrodinger/rdkit_extensions/convert.h"
 #include "schrodinger/rdkit_extensions/helm.h"
-#include "schrodinger/test/boost_checks.h"
-#include "schrodinger/test/testfiles.h"
+#include "test_common.h"
 
 using namespace schrodinger::rdkit_extensions;
-using schrodinger::test::mmshare_testfile;
 
 BOOST_AUTO_TEST_CASE(TestBasicCoarseGrainMol)
 {
@@ -149,7 +147,7 @@ BOOST_AUTO_TEST_CASE(TestAtomisticSmilesToCGString)
 BOOST_AUTO_TEST_CASE(Test_annotated_atomistic_to_cg)
 {
     auto atomistic_mol =
-        RDKit::v2::FileParsers::MolFromPDBFile(mmshare_testfile("1dng.pdb"));
+        RDKit::v2::FileParsers::MolFromPDBFile(testfile_path("1dng.pdb"));
     auto cg_mol = atomistic_to_cg(*atomistic_mol);
 
     BOOST_CHECK_EQUAL(to_string(*cg_mol, Format::HELM),

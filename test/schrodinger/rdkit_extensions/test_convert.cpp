@@ -30,8 +30,7 @@
 #include "schrodinger/rdkit_extensions/convert.h"
 #include "schrodinger/rdkit_extensions/molops.h"
 #include "schrodinger/rdkit_extensions/rgroup.h"
-#include "schrodinger/test/boost_checks.h"
-#include "schrodinger/test/checkexceptionmsg.h"
+#include "test_common.h"
 
 namespace bdata = boost::unit_test::data;
 using namespace schrodinger;
@@ -625,7 +624,7 @@ M  END)CTAB";
     BOOST_REQUIRE_EQUAL(mol->getNumAtoms(), 1);
 
     auto cxsmiles = to_string(*mol, Format::EXTENDED_SMILES);
-    BOOST_TEST(!test::contains(cxsmiles, std::string("molTotValence")));
+    BOOST_TEST(!cxsmiles.find("molTotValence") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(test_force_v2k)
