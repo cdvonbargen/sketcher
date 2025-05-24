@@ -1,4 +1,4 @@
-#define BOOST_TEST_DYN_LINK
+
 #define BOOST_TEST_MODULE test_rdkit_to_fasta
 
 #include <boost/test/data/test_case.hpp>
