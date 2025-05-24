@@ -43,6 +43,10 @@ find_package(fmt ${FMT_VERSION} REQUIRED)
 find_package(ZLIB ${ZLIB_VERSION} REQUIRED)
 find_package(zstd ${ZSTD_VERSION} REQUIRED)
 
+find_package(maeparser REQUIRED)
+find_package(coordgen REQUIRED)
+find_package(Eigen3 REQUIRED)
+
 # Common library/executable configuration
 function(setup_target TARGET)
   if(MSVC)
