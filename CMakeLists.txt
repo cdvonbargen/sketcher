@@ -93,7 +93,6 @@ target_link_libraries(
           RDKit::DetermineBonds
           RDKit::DistGeomHelpers
           RDKit::RDInchiLib
-          Eigen3::Eigen
           fmt::fmt
           ZLIB::ZLIB
           zstd::libzstd_static)
@@ -119,7 +118,7 @@ enable_testing()
 
 set(SKETCHER_TEST ${PROJECT_SOURCE_DIR}/test/schrodinger)
 file(GLOB_RECURSE TEST_SOURCE_LIST CONFIGURE_DEPENDS ${SKETCHER_TEST}/*.cpp)
-set(TEST_DEPENDENCIES Boost::unit_test_framework fmt::fmt Qt6::Widgets
+set(TEST_DEPENDENCIES Boost::unit_test_framework Eigen3::Eigen fmt::fmt Qt6::Widgets
                       ${SKETCHER_LIB})
 foreach(TEST_SOURCE ${TEST_SOURCE_LIST})
   cmake_path(GET TEST_SOURCE STEM TEST_TARGET)
