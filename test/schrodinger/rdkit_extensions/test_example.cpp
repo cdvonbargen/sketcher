@@ -1,5 +1,6 @@
 // @copyright Schrodinger, LLC - All Rights Reserved
 
+#define BOOST_TEST_DYN_LINK
 #define BOOST_TEST_MODULE test_example
 
 #include <boost/test/data/test_case.hpp>
