@@ -12,6 +12,7 @@ cmake_policy(SET CMP0167 NEW)
 # Dependencies
 file(READ external/versions.json VERSIONS)
 string(JSON BOOST_VERSION GET ${VERSIONS} boost)
+string(JSON EIGEN_VERSION GET ${VERSIONS} eigen)
 string(JSON FMT_VERSION GET ${VERSIONS} fmt)
 string(JSON QT_VERSION GET ${VERSIONS} qt)
 string(JSON RDKIT_VERSION GET ${VERSIONS} rdkit)
@@ -38,14 +39,11 @@ find_package(
   Boost ${BOOST_VERSION} REQUIRED COMPONENTS filesystem iostreams json
                                              serialization unit_test_framework)
 find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Widgets Svg)
+find_package(Eigen3 ${EIGEN_VERSION} REQUIRED)
 find_package(RDKit ${RDKIT_VERSION} REQUIRED)
 find_package(fmt ${FMT_VERSION} REQUIRED)
 find_package(ZLIB ${ZLIB_VERSION} REQUIRED)
 find_package(zstd ${ZSTD_VERSION} REQUIRED)
-
-find_package(maeparser REQUIRED)
-find_package(coordgen REQUIRED)
-find_package(Eigen3 REQUIRED)
 
 # Common library/executable configuration
 function(setup_target TARGET)
@@ -95,6 +93,7 @@ target_link_libraries(
           RDKit::DetermineBonds
           RDKit::DistGeomHelpers
           RDKit::RDInchiLib
+          Eigen3::Eigen
           fmt::fmt
           ZLIB::ZLIB
           zstd::libzstd_static)

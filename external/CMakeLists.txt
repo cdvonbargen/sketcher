@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Collect dependency versions
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/versions.json VERSIONS)
 string(JSON BOOST_VERSION GET ${VERSIONS} boost)
+string(JSON EIGEN_VERSION GET ${VERSIONS} eigen)
 string(JSON FMT_VERSION GET ${VERSIONS} fmt)
 string(JSON QT_VERSION GET ${VERSIONS} qt)
 string(JSON RDKIT_VERSION GET ${VERSIONS} rdkit)
@@ -90,6 +91,16 @@ ExternalProject_Add(
     -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/zstd-${ZSTD_VERSION}
     -DZSTD_BUILD_SHARED=OFF
     -DZSTD_BUILD_PROGRAMS=OFF)
+
+# Build Eigen library
+ExternalProject_Add(
+  eigen
+  GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+  GIT_TAG ${EIGEN_VERSION}
+  GIT_SHALLOW TRUE
+  CMAKE_ARGS
+    -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/eigen-${EIGEN_VERSION}
+)
 
 # Build Boost library
 set_cmake_arg(
