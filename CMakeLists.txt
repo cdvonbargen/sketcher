@@ -132,7 +132,7 @@ target_link_libraries(
 set(SKETCHER_LIB sketcher)
 build_schrodinger_library(${SKETCHER_LIB})
 target_compile_definitions(${SKETCHER_LIB} PRIVATE IN_SKETCHER_DLL)
-target_link_libraries(${SKETCHER_LIB} PRIVATE Qt6::Widgets Qt6::Svg
+target_link_libraries(${SKETCHER_LIB} PRIVATE Boost::boost Qt6::Widgets Qt6::Svg
                                               ${RDKIT_EXTENSIONS_LIB})
 # Enable Qt MOC and UIC for the sketcher library
 set_target_properties(${SKETCHER_LIB} PROPERTIES AUTOMOC ON)
