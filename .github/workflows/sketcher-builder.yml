@@ -34,7 +34,11 @@ jobs:
           echo PATH=$PATH >> $GITHUB_ENV
 
       - name: Install Python packages
-        run: python3 -m pip install ninja clang-format==14.0.6
+        run: python3 -m pip install ninja clang-format==14.0.6 pytest pytest-cpp pytest-github-actions-annotate-failures
+
+      - name: Install valgrind
+        if: matrix.build-output == 'debug'
+        run: sudo apt-get install valgrind
 
       - name: Code formatting check
         run: find . -name *.h -o -name *.cpp | xargs clang-format -n --Werror
@@ -181,29 +185,24 @@ jobs:
       - name: Build
         run: cmake --build build --config ${{ env.BUILD_TYPE }}
 
-      - name: Configure Node.js
+      - name: Run tests
+        if: matrix.build-output != 'wasm'
+        # Launching `xvfb-run -a` required for Ubuntu
+        run: |
+          ${{ matrix.os == 'ubuntu-latest' && 'xvfb-run -a' || ''}} \
+          pytest build/test/
+
+      - name: Configure Node.js for WASM tests
         if: matrix.build-output == 'wasm'
         # CMake uses Node.js to run the tests on emscripten builds
         uses: actions/setup-node@v4
         with:
           node-version: 22.14.0
 
-      - name: Run tests
+      - name: Run WASM tests
+        if: matrix.build-output == 'wasm'
         working-directory: build
-        # Launching `xvfb-run -a` required for Ubuntu non-wasm builds
-        run: |
-          ${{ matrix.os == 'ubuntu-latest' && matrix.build-output != 'wasm' && 'xvfb-run -a' || ''}} \
-          ctest --build-config ${{ env.BUILD_TYPE }} -LE memtest --output-on-failure
-
-      - name: Install valgrind
-        if: matrix.build-output == 'debug'
-        run: sudo apt-get install valgrind
-
-      - name: Run memtests
-        working-directory: build
-        if: matrix.build-output == 'debug'
-        run: |
-          xvfb-run -a ctest --build-config Debug -L memtest --output-on-failure
+        run: ctest --build-config ${{ env.BUILD_TYPE }} --output-on-failure
 
       - name: Download sketcher executable
         if: matrix.build-output != 'wasm'
