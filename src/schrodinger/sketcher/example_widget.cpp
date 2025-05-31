@@ -4,7 +4,7 @@
 
 #include <QWidget>
 
-#include "schrodinger/rdkit_extensions/example.h"
+#include "schrodinger/rdkit_extensions/convert.h"
 #include "schrodinger/sketcher/ui/ui_example_widget.h"
 
 namespace schrodinger
@@ -16,9 +16,9 @@ ExampleWidget::ExampleWidget(QWidget* parent) : QWidget(parent)
 {
     m_ui.reset(new Ui::ExampleWidgetForm());
     m_ui->setupUi(this);
-    if (rdkit_extensions::dependency_test("c1ccccc1")) {
-        m_ui->label->setText(QString::fromStdString("Dependencies work!"));
-    }
+    m_ui->label->setText(QString::fromStdString(
+        rdkit_extensions::to_string(rdkit_extensions::to_rdkit("C1=CC=CC=C1"),
+                                    rdkit_extensions::Format::SMILES)));
 }
 
 ExampleWidget::~ExampleWidget() = default;
