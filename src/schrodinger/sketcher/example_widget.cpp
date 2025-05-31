@@ -16,9 +16,10 @@ ExampleWidget::ExampleWidget(QWidget* parent) : QWidget(parent)
 {
     m_ui.reset(new Ui::ExampleWidgetForm());
     m_ui->setupUi(this);
-    m_ui->label->setText(QString::fromStdString(
-        rdkit_extensions::to_string(*rdkit_extensions::to_rdkit("C1=CC=CC=C1"),
-                                    rdkit_extensions::Format::SMILES)));
+    auto mol = rdkit_extensions::to_rdkit("C1=CC=CC=C1");
+    auto smiles =
+        rdkit_extensions::to_string(*mol, rdkit_extensions::Format::SMILES);
+    m_ui->label->setText(QString::fromStdString(smiles));
 }
 
 ExampleWidget::~ExampleWidget() = default;
