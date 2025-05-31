@@ -14,7 +14,7 @@ option(ENFORCE_DEPENDENCY_VERSIONS
     "Require that the dependencies match the versions listed in \
     external/versions.json"
     ON)
-    
+
 set(SUPPRESSION_FILE "test_valgrind.suppressions")
 set(MEMTEST_COMMAND
     "valgrind --tool=memcheck --time-stamp=yes --num-callers=20 \
@@ -180,7 +180,8 @@ foreach(TEST_SOURCE ${TEST_SOURCE_LIST})
     endforeach()
     list(APPEND CURRENT_MEMTEST_COMMAND
         "${PREFIX_PATH}/${TEST_COMMAND}")
-    add_test(NAME memtest_${TEST_TARGET} COMMAND ${CURRENT_MEMTEST_COMMAND})
-    set_property(TEST memtest_${TEST_TARGET} PROPERTY LABELS memtest)
+    set(MEMTEST_TARGET ${TEST_TARGET}_memtest)
+    add_test(NAME ${MEMTEST_TARGET} COMMAND ${CURRENT_MEMTEST_COMMAND})
+    set_property(TEST ${MEMTEST_TARGET} PROPERTY LABELS memtest)
   endif()
 endforeach()
