@@ -143,7 +143,7 @@ std::string get_compressed_string(const std::string& data,
     if (compression_type == CompressionType::UNKNOWN) {
         return data;
     } else {
-        std::stringstream ss(std::ios_base::out | std::ios::binary);
+        std::stringstream ss;
         // use maybe_compressed_ostream as RAII
         {
             maybe_compressed_ostream os(ss, compression_type);
@@ -159,14 +159,16 @@ std::string get_decompressed_string(const std::string& data,
     if (compression_type == CompressionType::UNKNOWN) {
         return data;
     } else {
+        printf("HERE1\n");
         maybe_compressed_istream is(data, compression_type);
+        printf("HERE2\n");
         return std::string(std::istreambuf_iterator<char>(is), {});
     }
 }
 
 std::string get_decompressed_string(const std::string& data)
 {
-    std::istringstream sstream(data, std::ios_base::in | std::ios::binary);
+    std::istringstream sstream(data);
     auto compression_type = get_compression_type(sstream);
     return get_decompressed_string(data, compression_type);
 }
