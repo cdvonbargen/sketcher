@@ -108,6 +108,7 @@ std::istream::pos_type maybe_compressed_istream::tellg()
 void maybe_compressed_istream::initialize_istream(
     std::istream& is, const CompressionType& compression_type)
 {
+    printf("HERE11\n");
     m_sdgr_is_compressed = compression_type != CompressionType::UNKNOWN;
     // if we don't do this, i.e. if we use the filtering buffer for reading
     // uncompressed inputs, we won't have a useful tellg function because
@@ -135,6 +136,7 @@ void maybe_compressed_istream::initialize_istream(
 
     m_sdgr_buffer->push(boost::ref(is), BUFFER_SIZE_FOR_COMPRESSED);
     this->init(&*m_sdgr_buffer);
+    printf("HERE22\n");
 }
 
 std::string get_compressed_string(const std::string& data,
@@ -159,9 +161,7 @@ std::string get_decompressed_string(const std::string& data,
     if (compression_type == CompressionType::UNKNOWN) {
         return data;
     } else {
-        printf("HERE1\n");
         maybe_compressed_istream is(data, compression_type);
-        printf("HERE2\n");
         return std::string(std::istreambuf_iterator<char>(is), {});
     }
 }
