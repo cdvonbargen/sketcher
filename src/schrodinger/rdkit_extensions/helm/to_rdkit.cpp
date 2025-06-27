@@ -165,7 +165,10 @@ void condense_monomer_list(const std::string_view& polymer_id,
     auto monomer_id = monomer.id;
     if (monomer.is_list) {
         condense_monomer_list(polymer_id, monomer_id);
-    } else if (monomer_id.front() == '[' && monomer_id.back() == ']') {
+    }
+    // Inline SMILES tokens are stripped in the parser.
+    else if (!monomer.is_smiles && monomer_id.front() == '[' &&
+             monomer_id.back() == ']') {
         monomer_id = monomer.id.substr(1, monomer.id.size() - 2);
     }
     return std::string{monomer_id};
@@ -368,6 +371,11 @@ void add_polymer_groups_and_extended_annotations(
     ::RDKit::RWMol& mol, const std::vector<polymer_group> polymer_groups,
     const std::string_view& extended_annotations)
 {
+    // nothing to do here
+    if (polymer_groups.empty() && extended_annotations.empty()) {
+        return;
+    }
+
     ::RDKit::SubstanceGroup sgroup(&mol, "DAT");
     sgroup.setProp("FIELDNAME", SUPPLEMENTARY_INFORMATION);
 
