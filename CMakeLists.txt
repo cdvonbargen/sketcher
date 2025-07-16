@@ -63,7 +63,7 @@ endif()
 find_package(
   Boost ${BOOST_VERSION} REQUIRED COMPONENTS filesystem iostreams json
                                              serialization unit_test_framework)
-find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Widgets Svg SvgWidgets)
+find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Widgets Svg SvgWidgets Test)
 find_package(Eigen3 ${EIGEN_VERSION} REQUIRED)
 find_package(RDKit ${RDKIT_VERSION} REQUIRED)
 find_package(fmt ${FMT_VERSION} REQUIRED)
@@ -179,6 +179,7 @@ set(TEST_DEPENDENCIES
     Eigen3::Eigen
     fmt::fmt
     Qt6::Widgets
+    Qt6::Test
     RDKit::FileParsers
     ${RDKIT_EXTENSIONS_TARGET}
     ${SKETCHER_TARGET})
@@ -192,19 +193,31 @@ set(MEMTEST_COMMAND
 separate_arguments(MEMTEST_COMMAND)
 
 foreach(TEST_SOURCE ${TEST_SOURCE_LIST})
-  cmake_path(GET TEST_SOURCE STEM TEST_TARGET)
+  cmake_path(GET TEST_SOURCE STEM TEST_STEM)
+  # Mirror the source directory for test collection and make unique target names
+  cmake_path(RELATIVE_PATH TEST_SOURCE OUTPUT_VARIABLE TEST_PATH)
+  cmake_path(GET TEST_PATH PARENT_PATH PREFIX_PATH)
+  # Create unique target name by replacing path separators with underscores
+  string(REPLACE "/" "_" TEST_TARGET_SUFFIX "${PREFIX_PATH}")
+  set(TEST_TARGET "${TEST_STEM}_${TEST_TARGET_SUFFIX}")
+  # Remove duplicate underscores and clean up the name
+  string(REGEX REPLACE "_+" "_" TEST_TARGET "${TEST_TARGET}")
+  string(REGEX REPLACE "^_|_$" "" TEST_TARGET "${TEST_TARGET}")
+  
   add_executable(${TEST_TARGET} ${TEST_SOURCE})
   setup_target(${TEST_TARGET})
   target_include_directories(${TEST_TARGET} PRIVATE ${PROJECT_SOURCE_DIR}/test)
   target_link_libraries(${TEST_TARGET} PRIVATE ${TEST_DEPENDENCIES})
+  # Enable Qt MOC and UIC only for test targets that need UI compilation
+  cmake_path(GET TEST_SOURCE FILENAME TEST_FILENAME)
+  if(TEST_FILENAME MATCHES "dialog|widget|ui_" OR TEST_SOURCE MATCHES "dialog|widget")
+    set_target_properties(${TEST_TARGET} PROPERTIES AUTOMOC ON AUTOUIC ON AUTOUIC_SEARCH_PATHS ${UI_DIR})
+  endif()
   if(EMSCRIPTEN)
     set(TEST_COMMAND node $<TARGET_FILE:${TEST_TARGET}>)
   else()
     set(TEST_COMMAND ${TEST_TARGET})
   endif()
-  # Mirror the source directory for test collection
-  cmake_path(RELATIVE_PATH TEST_SOURCE OUTPUT_VARIABLE TEST_PATH)
-  cmake_path(GET TEST_PATH PARENT_PATH PREFIX_PATH)
   set_target_properties(${TEST_TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY
                                                   ${PREFIX_PATH})
   if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")

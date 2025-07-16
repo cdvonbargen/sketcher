@@ -210,7 +210,7 @@ jobs:
         # Launching `xvfb-run -a` required for Ubuntu non-wasm builds
         run: |
           ${{ matrix.os == 'ubuntu-latest' && matrix.build-output != 'wasm' && 'xvfb-run -a' || ''}} \
-          ctest --build-config ${{ env.BUILD_TYPE }} -LE memtest --output-on-failure
+          ctest --build-config ${{ env.BUILD_TYPE }} -LE memtest --output-on-failure --output-junit junit-report.xml
 
       - name: Run memtests
         working-directory: build
