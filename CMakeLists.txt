@@ -116,9 +116,10 @@ endfunction()
 function(build_schrodinger_library TARGET)
   set(INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include/schrodinger/${TARGET})
   set(SRC_DIR ${PROJECT_SOURCE_DIR}/src/schrodinger/${TARGET})
-  # Collect public headers so that Qt can build .moc files
+  # Collect all headers, source, and resources; note we collect public headers
+  # so that Qt can build .moc files
   file(GLOB_RECURSE SOURCE_LIST CONFIGURE_DEPENDS ${INCLUDE_DIR}/*.h
-       ${SRC_DIR}/*.h ${SRC_DIR}/*.cpp)
+       ${SRC_DIR}/*.h ${SRC_DIR}/*.cpp ${SRC_DIR}/*.qrc)
   add_library(${TARGET} ${SOURCE_LIST})
   add_library(schrodinger::${TARGET} ALIAS ${TARGET})
   setup_target(${TARGET})
@@ -134,7 +135,8 @@ function(enable_qt_moc TARGET)
     ${TARGET}
     PROPERTIES AUTOMOC ON
                AUTOUIC ON
-               AUTOUIC_SEARCH_PATHS ${UI_DIR})
+               AUTOUIC_SEARCH_PATHS ${UI_DIR}
+               AUTORCC ON)
 endfunction()
 
 # schrodinger::rdkit_extensions library
@@ -178,7 +180,7 @@ enable_qt_moc(${SKETCHER_TARGET})
 set(APP_TARGET sketcher_app)
 add_executable(${APP_TARGET} src/app/main.cpp)
 setup_target(${APP_TARGET})
-target_link_libraries(${APP_TARGET} PRIVATE Qt6::Widgets ${SKETCHER_TARGET})
+target_link_libraries(${APP_TARGET} PRIVATE Boost::boost Qt6::Widgets ${SKETCHER_TARGET})
 
 # Tests
 enable_testing()
