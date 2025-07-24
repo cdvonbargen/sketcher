@@ -1,4 +1,8 @@
-// @copyright Schrodinger, LLC - All Rights Reserved
+/* -------------------------------------------------------------------------
+ * Schrodinger 2D Sketcher standalone executable
+ *
+ * Copyright Schrodinger LLC, All Rights Reserved.
+ --------------------------------------------------------------------------- */
 
 #include <QApplication>
 
