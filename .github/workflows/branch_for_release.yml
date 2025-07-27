@@ -1,0 +1,104 @@
+name: Create Release Branch and Next Quarter Workflow
+
+on:
+  workflow_dispatch: ~
+
+jobs:
+  create-release-branch:
+    runs-on: ubuntu-latest
+    outputs:
+      release_branch: ${{ steps.create-branch.outputs.release_branch }}
+      next_quarter_workflow: ${{ steps.calculate-next.outputs.next_quarter_workflow }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Extract version and create release branch
+        id: create-branch
+        run: |
+          # Extract version from CMakeLists.txt
+          version_line=$(grep "VERSION " CMakeLists.txt | head -1)
+          version=$(echo "$version_line" | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          echo "Current version: $version"
+          
+          # Extract major and minor version
+          major=$(echo $version | cut -d. -f1)
+          minor=$(echo $version | cut -d. -f2)
+          
+          # Create release branch name
+          release_branch="${major}-${minor}"
+          echo "Release branch: $release_branch"
+          echo "release_branch=$release_branch" >> $GITHUB_OUTPUT
+          
+          # Create and push release branch
+          git checkout -b "$release_branch"
+          git push origin "$release_branch"
+          
+          # Switch back to main
+          git checkout main
+
+      - name: Calculate next quarter workflow
+        id: calculate-next
+        run: |
+          # Find current quarter workflow (pattern: YYYY-Q.yml)
+          current_workflow=$(ls .github/workflows/ | grep -E "^[0-9]{4}-[0-9]+\.yml$" | head -1)
+          echo "Current workflow: $current_workflow"
+          
+          if [ -z "$current_workflow" ]; then
+            echo "No current quarter workflow found"
+            exit 1
+          fi
+          
+          # Extract year and quarter
+          base_name=$(basename "$current_workflow" .yml)
+          year=$(echo "$base_name" | cut -d- -f1)
+          quarter=$(echo "$base_name" | cut -d- -f2)
+          
+          echo "Current year: $year, quarter: $quarter"
+          
+          # Calculate next quarter
+          if [ "$quarter" = "4" ]; then
+            next_year=$((year + 1))
+            next_quarter=1
+          else
+            next_year=$year
+            next_quarter=$((quarter + 1))
+          fi
+          
+          next_workflow="${next_year}-${next_quarter}.yml"
+          echo "Next quarter workflow: $next_workflow"
+          echo "next_quarter_workflow=$next_workflow" >> $GITHUB_OUTPUT
+          echo "current_workflow=$current_workflow" >> $GITHUB_OUTPUT
+
+      - name: Clone workflow for next quarter
+        run: |
+          current_workflow="${{ steps.calculate-next.outputs.current_workflow }}"
+          next_workflow="${{ steps.calculate-next.outputs.next_quarter_workflow }}"
+          
+          echo "Cloning $current_workflow to $next_workflow"
+          
+          # Copy the current workflow to next quarter
+          cp ".github/workflows/$current_workflow" ".github/workflows/$next_workflow"
+          
+          # Update the workflow name in the new file
+          next_name=$(basename "$next_workflow" .yml)
+          sed -i "s/name: .*/name: $next_name Patch Version Increment/" ".github/workflows/$next_workflow"
+          
+          # Commit and push the new workflow
+          git add ".github/workflows/$next_workflow"
+          git commit -m "Add $next_workflow workflow for next quarter"
+          git push origin main
+
+      - name: Summary
+        run: |
+          echo "✅ Created release branch: ${{ steps.create-branch.outputs.release_branch }}"
+          echo "✅ Created next quarter workflow: ${{ steps.calculate-next.outputs.next_quarter_workflow }}"
+          echo ""
+          echo "Release branch '${{ steps.create-branch.outputs.release_branch }}' is ready for release preparation."
+          echo "Next quarter workflow '${{ steps.calculate-next.outputs.next_quarter_workflow }}' is ready for the next development cycle."

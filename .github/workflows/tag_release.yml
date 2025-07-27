@@ -1,0 +1,118 @@
+name: Tag Release and Cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version (e.g., 2025.4.1) - leave empty to auto-detect from CMakeLists.txt'
+        required: false
+        type: string
+
+jobs:
+  tag-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0  # Fetch all history for all branches and tags
+          
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Validate release branch
+        id: validate
+        run: |
+          current_branch=$(git rev-parse --abbrev-ref HEAD)
+          echo "Current branch: $current_branch"
+          
+          # Check if we're on a release branch (pattern: YYYY-Q)
+          if [[ ! $current_branch =~ ^[0-9]{4}-[0-9]+$ ]]; then
+            echo "❌ Error: This workflow must be run on a release branch (format: YYYY-Q)"
+            echo "Current branch '$current_branch' does not match the expected pattern"
+            exit 1
+          fi
+          
+          echo "✅ Running on valid release branch: $current_branch"
+          echo "release_branch=$current_branch" >> $GITHUB_OUTPUT
+
+      - name: Determine release version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.release_version }}" ]; then
+            version="${{ github.event.inputs.release_version }}"
+            echo "Using provided version: $version"
+          else
+            # Extract version from CMakeLists.txt
+            version=$(grep "VERSION " CMakeLists.txt | head -1 | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+            echo "Auto-detected version from CMakeLists.txt: $version"
+          fi
+          
+          echo "release_version=$version" >> $GITHUB_OUTPUT
+          echo "tag_name=v$version" >> $GITHUB_OUTPUT
+
+      - name: Create and push tag
+        run: |
+          tag_name="${{ steps.version.outputs.tag_name }}"
+          version="${{ steps.version.outputs.release_version }}"
+          
+          echo "Creating tag: $tag_name"
+          
+          # Check if tag already exists
+          if git rev-parse "$tag_name" >/dev/null 2>&1; then
+            echo "❌ Tag $tag_name already exists"
+            exit 1
+          fi
+          
+          # Create annotated tag
+          git tag -a "$tag_name" -m "Release $version"
+          
+          # Push tag to origin
+          git push origin "$tag_name"
+          
+          echo "✅ Created and pushed tag: $tag_name"
+
+      - name: Switch to main and remove RC workflow
+        run: |
+          release_branch="${{ steps.validate.outputs.release_branch }}"
+          
+          # Switch to main branch
+          git checkout main
+          git pull origin main
+          
+          # Find the corresponding workflow file (pattern: YYYY-Q.yml)
+          workflow_file="${release_branch}.yml"
+          workflow_path=".github/workflows/$workflow_file"
+          
+          echo "Looking for workflow file: $workflow_path"
+          
+          if [ -f "$workflow_path" ]; then
+            echo "✅ Found workflow file: $workflow_file"
+            
+            # Remove the workflow file
+            git rm "$workflow_path"
+            
+            # Commit the removal
+            git commit -m "Remove $workflow_file workflow after release ${{ steps.version.outputs.release_version }}"
+            
+            # Push to main
+            git push origin main
+            
+            echo "✅ Removed workflow file: $workflow_file from main branch"
+          else
+            echo "⚠️  Workflow file $workflow_file not found on main branch"
+            echo "This is expected if the workflow was already removed"
+          fi
+
+      - name: Summary
+        run: |
+          echo "🎉 Release tagged successfully!"
+          echo ""
+          echo "✅ Tagged release: ${{ steps.version.outputs.tag_name }}"
+          echo "✅ Release branch: ${{ steps.validate.outputs.release_branch }}"
+          echo "✅ Cleaned up workflow from main branch"
+          echo ""
+          echo "The release ${{ steps.version.outputs.release_version }} is now tagged and the"
+          echo "corresponding workflow has been removed from main to prevent further automated bumps."
