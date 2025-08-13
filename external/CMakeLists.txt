@@ -242,7 +242,7 @@ set_cmake_arg(QT_BUILD_SUBMODULES ${QT_GIT_SUBMODULES})
 ExternalProject_Add(
   qt
   GIT_REPOSITORY https://github.com/qt/qt5.git
-  GIT_TAG v${QT_VERSION}
+  GIT_TAG v${QT_VERSION}-lts-lgpl
   GIT_SUBMODULES ${QT_GIT_SUBMODULES}
   GIT_SHALLOW TRUE
   CMAKE_ARGS
