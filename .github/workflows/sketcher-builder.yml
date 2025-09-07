@@ -218,25 +218,24 @@ jobs:
           paths: "build/junit-report.xml"
         if: always() && matrix.build-output != 'wasm'
 
-      - name: Download sketcher executable
-        if: matrix.build-output != 'wasm'
-        uses: actions/upload-artifact@v4
-        env:
-            # ".exe" on Windows, no extension everywhere else
-            EXT: ${{matrix.os == 'windows-latest' && '.exe' || ''}}
-        with:
-          name: sketcher-${{ matrix.build-output }}-${{ matrix.os }}
-          path: build/sketcher_app${{env.EXT}}
-
       - name: Create wasm tarball
         if: matrix.build-output == 'wasm'
         env:
             QT_DIR: ${{ steps.fetch-qt.outputs.path }}
         run: ./wasm/create_wasm_tarball.sh sketcher-wasm
 
-      - name: Download wasm tarball
-        if: matrix.build-output == 'wasm'
+      - name: Set artifact path
+        id: artifact-path
+        run: |
+          echo "path=${{
+            matrix.build-output == 'wasm' && 'sketcher-wasm.tar.gz' ||
+            matrix.os == 'macos-latest' && 'build/sketcher_app.app' ||
+            matrix.os == 'windows-latest' && 'build/sketcher_app.exe' ||
+            'build/sketcher_app'
+          }}" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sketcher-${{ matrix.build-output }}
-          path: sketcher-wasm.tar.gz
+          name: sketcher-${{ matrix.build-output }}-${{ matrix.os }}
+          path: ${{ steps.artifact-path.outputs.path }}
