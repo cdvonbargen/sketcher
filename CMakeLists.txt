@@ -183,9 +183,14 @@ configure_file(${PROJECT_SOURCE_DIR}/include/schrodinger/sketcher/version.h.in
                ${PROJECT_BINARY_DIR}/include/schrodinger/sketcher/version.h)
 enable_qt_moc(${SKETCHER_TARGET})
 
+set(MACOSX_BUNDLE_ICON_FILE "sketcher.icns")
+set_source_files_properties(src/app/sketcher.icns PROPERTIES
+    MACOSX_PACKAGE_LOCATION "Resources")
+
 # Standalone executable
 set(APP_TARGET sketcher_app)
-add_executable(${APP_TARGET} src/app/main.cpp)
+file(GLOB_RECURSE APP_SOURCE_LIST CONFIGURE_DEPENDS src/app/*)
+add_executable(${APP_TARGET} MACOSX_BUNDLE ${APP_SOURCE_LIST})
 setup_target(${APP_TARGET})
 target_link_libraries(${APP_TARGET} PRIVATE Boost::boost Qt6::Widgets
                                             ${SKETCHER_TARGET})
