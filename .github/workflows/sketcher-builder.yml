@@ -224,12 +224,18 @@ jobs:
             QT_DIR: ${{ steps.fetch-qt.outputs.path }}
         run: ./wasm/create_wasm_tarball.sh sketcher-wasm
 
+      - name: Test
+        if: matrix.os == 'macos-latest'
+        run: |
+          mkdir -p artifact-staging
+          cp -R build/sketcher_app.app artifact-staging/
+
       - name: Set artifact path
         id: artifact-path
         run: |
           echo "path=${{
             matrix.build-output == 'wasm' && 'sketcher-wasm.tar.gz' ||
-            matrix.os == 'macos-latest' && 'build/sketcher_app.app' ||
+            matrix.os == 'macos-latest' && 'artifact-staging' ||
             matrix.os == 'windows-latest' && 'build/sketcher_app.exe' ||
             'build/sketcher_app'
           }}" >> $GITHUB_OUTPUT
