@@ -2,25 +2,32 @@
 
 set -euo pipefail
 
-export INSTALL_DIR=$1
+export TARGET_ROOT=$1
+export INSTALL_DIR=$2
+
 
 if [[ -z "$INSTALL_DIR" ]]; then
     echo "Must give filename for the tarball" >&2
+    exit 1
+fi
+
+if [[ -z "$TARGET_ROOT" ]]; then
+    echo "Must give build directory path" >&2
     exit 1
 fi
 rm -fr ${INSTALL_DIR} || true
 mkdir -p ${INSTALL_DIR}
 
 echo -e "Building WASM distibution in ${INSTALL_DIR}"
-echo -e "\tRunning in:" `pwd` 
+echo -e "\tRunning in:" `pwd`
 
-cp -v ./build/sketcher_app.js ${INSTALL_DIR}
-cp -v ./build/sketcher_app.wasm ${INSTALL_DIR}
+cp -v ./${TARGET_ROOT}.js ${INSTALL_DIR}
+cp -v ./${TARGET_ROOT}.wasm ${INSTALL_DIR}
 cp -v ${QT_DIR}/plugins/platforms/qtloader.js ${INSTALL_DIR}
 cp -vr ./wasm/public/. ${INSTALL_DIR}
 
-export md5Wasm=$(md5sum ./build/sketcher_app.wasm | awk '{ print $1 }')
-export md5Js=$(md5sum ./build/sketcher_app.js | awk '{ print $1 }')
+export md5Wasm=$(md5sum ./${TARGET_ROOT}.wasm | awk '{ print $1 }')
+export md5Js=$(md5sum ./${TARGET_ROOT}.js | awk '{ print $1 }')
 
 perl -i -pe 's/\.wasm/.wasm?cache_bust=$ENV{md5Wasm}/g' ${INSTALL_DIR}/qtloader.js
 perl -i -pe 's/"\.js"/".js?cache_bust=$ENV{md5Js}"/g' ${INSTALL_DIR}/qtloader.js
