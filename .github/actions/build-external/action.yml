@@ -25,8 +25,9 @@ runs:
       id: vars
       shell: bash
       run: |
-        echo "build-dir=build/external${{ inputs.host-build == 'true' && '/host' || '' }}" >> $GITHUB_OUTPUT
-        echo "lib-dir=build/external${{ inputs.host-build == 'true' && '/host' || '' }}/${{ inputs.library }}-${{ inputs.version }}" >> $GITHUB_OUTPUT
+        BUILD_DIR="build/external${{ inputs.host-build == 'true' && '/host' || '' }}"
+        echo "build-dir=${BUILD_DIR}" >> $GITHUB_OUTPUT
+        echo "lib-dir=${BUILD_DIR}/${{ inputs.library }}-${{ inputs.version }}" >> $GITHUB_OUTPUT
 
     - uses: actions/cache@v4
       id: cache-check
