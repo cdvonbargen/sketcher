@@ -21,7 +21,7 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Determine the build directory
+    - name: Determine the build directories
       id: vars
       shell: bash
       run: |
@@ -33,7 +33,8 @@ runs:
       id: cache-check
       with:
         path: ${{ steps.vars.outputs.lib-dir }}
-        key: ${{ inputs.library }}-${{ inputs.version }}-${{ runner.os }}-${{ matrix.build-output }}${{ inputs.host-build == 'true' && '-host' || '' }}
+        # Regenerate the cache is the version OR external/CMakeLists.txt changes
+        key: ${{ inputs.library }}-${{ inputs.version }}-${{ runner.os }}-${{ matrix.build-output }}${{ inputs.host-build == 'true' && '-host' || '' }}-${{ hashFiles('external/CMakeLists.txt') }}
 
     - name: Build library
       if: steps.cache-check.outputs.cache-hit != 'true'
