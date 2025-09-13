@@ -1,5 +1,5 @@
 diff --git a/Code/RDGeneral/types.cpp b/Code/RDGeneral/types.cpp
-index 8ff43d85..67637b66 100644
+index 8ff43d854..67637b665 100644
 --- a/Code/RDGeneral/types.cpp
 +++ b/Code/RDGeneral/types.cpp
 @@ -12,144 +12,6 @@
@@ -148,7 +148,7 @@ index 8ff43d85..67637b66 100644
  const double MAX_DOUBLE = std::numeric_limits<double>::max();
  const double EPS_DOUBLE = std::numeric_limits<double>::epsilon();
 diff --git a/Code/RDGeneral/types.h b/Code/RDGeneral/types.h
-index 9e5e59a3..8b8763cf 100644
+index 9e5e59a3f..8b8763cf2 100644
 --- a/Code/RDGeneral/types.h
 +++ b/Code/RDGeneral/types.h
 @@ -1,4 +1,4 @@
