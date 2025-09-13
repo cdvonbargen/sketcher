@@ -16,23 +16,22 @@ inputs:
 outputs:
   path:
     description: "Absolute path to the installed dependency"
-    value: ${{ github.workspace }}/${{ steps.set-vars.outputs.lib-build-dir }}
+    value: ${{ github.workspace }}/${{ steps.lib-build-dir.outputs.path }}
 
 runs:
   using: "composite"
   steps:
-    - name: Set derived variables
-      id: set-vars
+    - name: Determine the build directory
+      id: lib-build-dir
       shell: bash
       run: |
-        echo "lib-version=${{ inputs.library }}-${{ inputs.version }}" >> $GITHUB_OUTPUT
-        echo "lib-build-dir=build/external${{ inputs.host-build == 'true' && '/host' || '' }}/${{ steps.set-vars.outputs.lib-version }}" >> $GITHUB_OUTPUT
+        echo "path=build/external${{ inputs.host-build == 'true' && '/host' || '' }}/${{ inputs.library }}-${{ inputs.version }}" >> $GITHUB_OUTPUT
 
     - uses: actions/cache@v4
       id: cache-check
       with:
-        path: ${{ steps.set-vars.outputs.lib-build-dir }}
-        key: ${{ steps.set-vars.outputs.lib-version }}-${{ runner.os }}-${{ matrix.build-output }}${{ inputs.host-build == 'true' && '-host' || '' }}
+        path: ${{ steps.lib-build-dir.outputs.path }}
+        key: ${{ inputs.library }}-${{ inputs.version }}-${{ runner.os }}-${{ matrix.build-output }}${{ inputs.host-build == 'true' && '-host' || '' }}
 
     - name: Build library
       if: steps.cache-check.outputs.cache-hit != 'true'
@@ -44,6 +43,6 @@ runs:
         endl: ${{ runner.os == 'windows' && '^' || '\' }}
       run: |
         ${{ env.use-emsdk == 'true' && 'source emsdk_env.sh && ' || '' }}${{env.endl}}
-        cmake --build ${{ steps.set-vars.outputs.lib-build-dir }} --verbose${{env.endl}}
+        cmake --build ${{ steps.lib-build-dir.outputs.path }} --verbose${{env.endl}}
               --target ${{ inputs.library }}${{env.endl}}
               --config ${{ env.BUILD_TYPE }}
