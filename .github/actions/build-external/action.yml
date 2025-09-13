@@ -16,7 +16,7 @@ inputs:
 outputs:
   path:
     description: "Absolute path to the installed dependency"
-    value: ${{ github.workspace }}/${{ steps.vars.outputs.build-dir }}/${{ inputs.library }}-${{ inputs.version }}
+    value: ${{ github.workspace }}/${{ steps.vars.outputs.lib-dir }}
 
 runs:
   using: "composite"
@@ -26,12 +26,12 @@ runs:
       shell: bash
       run: |
         echo "build-dir=build/external${{ inputs.host-build == 'true' && '/host' || '' }}" >> $GITHUB_OUTPUT
-        echo "lib-dir=${{ steps.vars.outputs.build-dir }}/${{ inputs.library }}-${{ inputs.version }}" >> $GITHUB_OUTPUT
+        echo "lib-dir=build/external${{ inputs.host-build == 'true' && '/host' || '' }}/${{ inputs.library }}-${{ inputs.version }}" >> $GITHUB_OUTPUT
 
     - uses: actions/cache@v4
       id: cache-check
       with:
-        path: ${{ steps.vars.outputs.build-dir }}/${{ inputs.library }}-${{ inputs.version }}
+        path: ${{ steps.vars.outputs.lib-dir }}
         key: ${{ inputs.library }}-${{ inputs.version }}-${{ runner.os }}-${{ matrix.build-output }}${{ inputs.host-build == 'true' && '-host' || '' }}
 
     - name: Build library
