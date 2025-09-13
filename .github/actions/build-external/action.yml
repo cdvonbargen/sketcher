@@ -16,21 +16,22 @@ inputs:
 outputs:
   path:
     description: "Absolute path to the installed dependency"
-    value: ${{ github.workspace }}/${{ steps.lib-build-dir.outputs.path }}
+    value: ${{ github.workspace }}/${{ steps.vars.outputs.build-dir }}/${{ inputs.library }}-${{ inputs.version }}
 
 runs:
   using: "composite"
   steps:
     - name: Determine the build directory
-      id: lib-build-dir
+      id: vars
       shell: bash
       run: |
-        echo "path=build/external${{ inputs.host-build == 'true' && '/host' || '' }}/${{ inputs.library }}-${{ inputs.version }}" >> $GITHUB_OUTPUT
+        echo "build-dir=build/external${{ inputs.host-build == 'true' && '/host' || '' }}" >> $GITHUB_OUTPUT
+        echo "lib-dir=${{ steps.vars.outputs.build-dir }}/${{ inputs.library }}-${{ inputs.version }}" >> $GITHUB_OUTPUT
 
     - uses: actions/cache@v4
       id: cache-check
       with:
-        path: ${{ steps.lib-build-dir.outputs.path }}
+        path: ${{ steps.vars.outputs.build-dir }}/${{ inputs.library }}-${{ inputs.version }}
         key: ${{ inputs.library }}-${{ inputs.version }}-${{ runner.os }}-${{ matrix.build-output }}${{ inputs.host-build == 'true' && '-host' || '' }}
 
     - name: Build library
@@ -40,9 +41,10 @@ runs:
       shell: ${{ runner.os == 'windows' && 'cmd' || 'bash' }}
       env:
         use-emsdk: ${{ matrix.build-output == 'wasm' && inputs.host-build == 'false' && 'true' }}
+        # cmd uses ^ for escaping newlines instead of
         endl: ${{ runner.os == 'windows' && '^' || '\' }}
       run: |
         ${{ env.use-emsdk == 'true' && 'source emsdk_env.sh && ' || '' }}${{env.endl}}
-        cmake --build ${{ steps.lib-build-dir.outputs.path }} --verbose${{env.endl}}
+        cmake --build ${{ steps.vars.outputs.build-dir }} --verbose${{env.endl}}
               --target ${{ inputs.library }}${{env.endl}}
               --config ${{ env.BUILD_TYPE }}
