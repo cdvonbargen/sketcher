@@ -31,7 +31,7 @@ runs:
         lib-build-dir: build/external/${{ inputs.host-build == 'true' && 'host/' || '' }}
       with:
         path: ${{ env.lib-build-dir }}${{ inputs.library }}-${{ inputs.version }}
-        key: ${{ inputs.library }}-${{ inputs.version }}${{inputs.cache-suffix}}-${{ runner.os }}-${{ inputs.host-build == 'true' && 'host' || matrix.build-output }}-${{ hashFiles('external/CMakeLists.txt') }}
+        key: ${{ inputs.library }}-${{ inputs.version }}${{inputs.cache-suffix}}-${{ runner.os }}-${{ inputs.host-build == 'true' && 'host' || matrix.build-output }}
 
     - name: Build library
       if: steps.cache-check.outputs.cache-hit != 'true'
