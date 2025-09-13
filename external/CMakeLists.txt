@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.30)
 include(ExternalProject)
 
 project(schrodinger_sketcher_external)
@@ -126,6 +126,7 @@ set_cmake_arg(
   geometry
   iostreams
   json
+  locale
   multi_array
   multiprecision
   program_options

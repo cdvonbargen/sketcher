@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.30)
 
 project(
   schrodinger_sketcher
@@ -30,9 +30,7 @@ if(${ENFORCE_DEPENDENCY_VERSIONS})
   foreach(dep ${DEPENDENCIES})
     string(TOUPPER ${dep} dep_upper)
     string(JSON ${dep_upper}_VERSION GET ${VERSIONS} ${dep})
-    set(${dep_upper}_VERSION
-        ${${dep_upper}_VERSION}
-        PARENT_SCOPE)
+    set(${dep_upper}_VERSION ${${dep_upper}_VERSION})
   endforeach()
 endif()
 
@@ -112,12 +110,9 @@ function(setup_target TARGET)
     # We optimize for space in WASM builds because otherwise binaryen (run
     # because of ASYNCIFY) runs out of memory
     target_link_options(${TARGET} PRIVATE -sGL_ENABLE_GET_PROC_ADDRESS
-                                          -fexceptions
-                                          -sDISABLE_EXCEPTION_CATCHING=0
-                                          -Os)
+                        -fexceptions -sDISABLE_EXCEPTION_CATCHING=0 -Os)
     target_compile_options(${TARGET} PRIVATE -fexceptions
-                                             -sDISABLE_EXCEPTION_CATCHING=0
-                                             -Os)
+                                             -sDISABLE_EXCEPTION_CATCHING=0 -Os)
   endif()
 endfunction()
 
@@ -204,9 +199,9 @@ if(EMSCRIPTEN)
       -fexceptions
       -sDISABLE_EXCEPTION_CATCHING=0)
 endif()
-target_link_libraries(${APP_TARGET} PRIVATE Boost::boost Qt6::Widgets
-                                            ${SKETCHER_TARGET}
-                                            ${EXTRA_SKETCHER_APP_LINK_FLAGS})
+target_link_libraries(
+  ${APP_TARGET} PRIVATE Boost::boost Qt6::Widgets ${SKETCHER_TARGET}
+                        ${EXTRA_SKETCHER_APP_LINK_FLAGS})
 
 # Tests
 if(ENABLE_TESTING)
