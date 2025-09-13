@@ -25,7 +25,7 @@ This project is released by Schrödinger, Inc. and is available under an open-so
 ## Build Prerequisites
 
 * A C++ compiler supporting C++20 or later
-* CMake (version 3.30 or later)
+* CMake (version 3.24 or later)
 * All [required dependencies](https://github.com/schrodinger/sketcher/blob/main/external/versions.json) installed and accessible to CMake
 
 ## Support and Community
