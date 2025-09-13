@@ -34,7 +34,7 @@ jobs:
           echo PATH=$PATH >> $GITHUB_ENV
 
       - name: Install Python packages
-        run: python3 -m pip install clang-format==14.0.6 cmake==3.24 ninja==1.13.0
+        run: python3 -m pip install clang-format==14.0.6 cmake==3.24 ninja==1.13.0 pytest pytest-cpp
 
       - name: Install valgrind
         if: matrix.build-output == 'memtest'
@@ -201,10 +201,10 @@ jobs:
       - name: Run tests
         working-directory: build
         if: matrix.build-output == 'app'
-        # Launching `xvfb-run -a` required for Ubuntu non-wasm builds
+        # Launching `xvfb-run -a` required for Ubuntu
         run: |
           ${{ matrix.os == 'ubuntu-latest' && 'xvfb-run -a' || ''}} \
-          ctest --build-config ${{ env.BUILD_TYPE }} -LE memtest --output-on-failure --output-junit junit-report.xml
+          pytest build/test/ --junitxml junit-report.xml
 
       - name: Run memtests
         working-directory: build
