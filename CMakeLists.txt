@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.31)
 
 project(
   schrodinger_sketcher
@@ -11,9 +11,7 @@ cmake_policy(SET CMP0167 NEW)
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
 option(ENABLE_TESTING "Build and enable tests" ON)
-option(ENFORCE_DEPENDENCY_VERSIONS
-       "Require that the dependencies match the versions listed in \
-    external/versions.json" ON)
+option(ENFORCE_DEPENDENCY_VERSIONS "Require versions.json enforcement" ON)
 
 # Load dependency versions
 if(${ENFORCE_DEPENDENCY_VERSIONS})

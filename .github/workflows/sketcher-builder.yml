@@ -34,7 +34,7 @@ jobs:
           echo PATH=$PATH >> $GITHUB_ENV
 
       - name: Install Python packages
-        run: python3 -m pip install clang-format==14.0.6 cmake==3.30 ninja==1.13.0
+        run: python3 -m pip install clang-format==14.0.6 cmake==3.31 ninja==1.13.0
 
       - name: Install valgrind
         if: matrix.build-output == 'memtest'
@@ -196,7 +196,7 @@ jobs:
                 ${{ matrix.build-output == 'wasm' && '-DENABLE_TESTING=OFF' || '' }}
 
       - name: Build
-        run: cmake --build build --config ${{ env.BUILD_TYPE }}
+        run: cmake --build build --verbose --config ${{ env.BUILD_TYPE }}
 
       - name: Run tests
         working-directory: build
