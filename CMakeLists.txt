@@ -182,9 +182,16 @@ configure_file(${PROJECT_SOURCE_DIR}/include/schrodinger/sketcher/version.h.in
                ${PROJECT_BINARY_DIR}/include/schrodinger/sketcher/version.h)
 enable_qt_moc(${SKETCHER_TARGET})
 
+set(MACOSX_BUNDLE_ICON_FILE "sketcher.icns")
+set_source_files_properties(src/app/sketcher.icns
+                            PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+
 # Standalone executable
-set(APP_TARGET sketcher_app)
-add_executable(${APP_TARGET} src/app/main.cpp)
+set(APP_TARGET 2DSketcher)
+file(GLOB_RECURSE APP_SOURCE_LIST CONFIGURE_DEPENDS src/app/*)
+add_executable(${APP_TARGET} MACOSX_BUNDLE ${APP_SOURCE_LIST})
+set_target_properties(${APP_TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+                                               ${CMAKE_BINARY_DIR}/sketcher_app)
 setup_target(${APP_TARGET})
 if(EMSCRIPTEN)
   set(EXTRA_SKETCHER_APP_LINK_FLAGS
@@ -198,6 +205,23 @@ endif()
 target_link_libraries(
   ${APP_TARGET} PRIVATE Boost::boost Qt6::Widgets ${SKETCHER_TARGET}
                         ${EXTRA_SKETCHER_APP_LINK_FLAGS})
+
+# Copy over the necessary WASM files into the application directory
+if(EMSCRIPTEN)
+  add_custom_target(
+    update_wasm_files
+    DEPENDS ${APP_TARGET}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      ${QT_HOST_PATH}/plugins/platforms/qtloader.js
+      ${CMAKE_BINARY_DIR}/sketcher_app/qtloader.js
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+      ${CMAKE_SOURCE_DIR}/wasm/public/
+      ${CMAKE_BINARY_DIR}/sketcher_app/
+    COMMAND
+      python3 ${CMAKE_SOURCE_DIR}/wasm/update_cache_bust.py
+      --wasm-dir ${CMAKE_BINARY_DIR}/sketcher_app
+      --app-target ${APP_TARGET})
+endif()
 
 # Tests
 if(ENABLE_TESTING)
