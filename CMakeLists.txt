@@ -156,6 +156,7 @@ target_link_libraries(
           Boost::serialization
           fmt::fmt
           RDKit::ChemDraw
+          expatpp
           RDKit::ChemReactions
           RDKit::DetermineBonds
           RDKit::DistGeomHelpers
