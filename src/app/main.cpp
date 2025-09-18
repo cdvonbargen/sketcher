@@ -96,11 +96,11 @@ EMSCRIPTEN_BINDINGS(sketcher)
         .value("MRV", Format::MRV)
         .value("CDXML", Format::CDXML)
         .value("HELM", Format::HELM)
-        .value("FASTA_PEPTIDE", Format::HELM)
-        .value("FASTA_DNA", Format::HELM)
-        .value("FASTA_RNA", Format::HELM)
-        .value("FASTA", Format::HELM)
-        .value("FMP", Format::HELM);
+        .value("FASTA_PEPTIDE", Format::FASTA_PEPTIDE)
+        .value("FASTA_DNA", Format::FASTA_DNA)
+        .value("FASTA_RNA", Format::FASTA_RNA)
+        .value("FASTA", Format::FASTA)
+        .value("FMP", Format::FMP);
 
     emscripten::enum_<ImageFormat>("ImageFormat")
         .value("PNG", ImageFormat::PNG)
