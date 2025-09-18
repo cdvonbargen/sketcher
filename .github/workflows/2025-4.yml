@@ -24,8 +24,7 @@ jobs:
       - name: Check for recent commits
         id: check-commits
         run: |
-          git fetch origin ${{ env.BRANCH }}
-          has_recent=$(git log origin/${{ env.BRANCH }} --since="24 hours ago" --not --author="GitHub Action" --oneline | head -1 | wc -l)
+          has_recent=$(git log origin/main --since="24 hours ago" --oneline | grep -v "GitHub Action" | wc -l)
           echo "has_recent_commits=$([ $has_recent -gt 0 ] && echo true || echo false)" >> $GITHUB_OUTPUT
 
       - name: Increment patch version
