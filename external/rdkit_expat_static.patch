@@ -1,0 +1,16 @@
+diff --git a/External/ChemDraw/CMakeLists.txt b/External/ChemDraw/CMakeLists.txt
+index d4e88ebce..4ec2549c5 100644
+--- a/External/ChemDraw/CMakeLists.txt
++++ b/External/ChemDraw/CMakeLists.txt
+@@ -36,6 +36,11 @@ if(RDK_BUILD_CHEMDRAW_SUPPORT)
+    endif(WORDS_BIGENDIAN)
+ 
+ 
++   # Set expat to build static libraries when RDKit is building static libraries
++   if(RDK_INSTALL_STATIC_LIBS)
++     set(EXPAT_INSTALL_STATIC_LIBS ON)
++   endif()
++
+    # we don't want to install expat, this is statically linked in to the ChemDraw lib
+    #  however, we don't want to install it so use the undocumented EXCLUDE_FROM_ALL
+    add_subdirectory(chemdraw/expatpp EXCLUDE_FROM_ALL)
