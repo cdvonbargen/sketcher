@@ -4,8 +4,8 @@ index d4e88ebce..4ec2549c5 100644
 +++ b/External/ChemDraw/CMakeLists.txt
 @@ -36,6 +36,11 @@ if(RDK_BUILD_CHEMDRAW_SUPPORT)
     endif(WORDS_BIGENDIAN)
- 
- 
+
+
 +   # Set expat to build static libraries when RDKit is building static libraries
 +   if(RDK_INSTALL_STATIC_LIBS)
 +     set(EXPAT_INSTALL_STATIC_LIBS ON)
@@ -14,3 +14,47 @@ index d4e88ebce..4ec2549c5 100644
     # we don't want to install expat, this is statically linked in to the ChemDraw lib
     #  however, we don't want to install it so use the undocumented EXCLUDE_FROM_ALL
     add_subdirectory(chemdraw/expatpp EXCLUDE_FROM_ALL)
+diff --git a/External/ChemDraw/chemdraw/expatpp/CMakeLists.txt b/External/ChemDraw/chemdraw/expatpp/CMakeLists.txt
+index abc123def..def456ghi 100644
+--- a/External/ChemDraw/chemdraw/expatpp/CMakeLists.txt
++++ b/External/ChemDraw/chemdraw/expatpp/CMakeLists.txt
+@@ -34,6 +34,15 @@ target_include_directories(expat
+       $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+       )
+
++if(EXPAT_INSTALL_STATIC_LIBS)
++  add_library(expat_static STATIC ${EXPAT_SRC})
++  target_include_directories(expat_static
++     PRIVATE
++       ${CMAKE_CURRENT_SOURCE_DIR}/expatpp-code-r6-trunk/src_pp
++     PUBLIC
++       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/expatpp-code-r6-trunk/expat/lib>
++       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/expatpp-code-r6-trunk/src_pp>
++       $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
++       )
++endif(EXPAT_INSTALL_STATIC_LIBS)
++
+ if(EXPAT_INSTALL_STATIC_LIBS)
+   target_include_directories(expat_static
+      PRIVATE
+@@ -61,11 +70,13 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR
+   # turn off warnings as errors, this throws a bunch
+   target_compile_options(expat PRIVATE "-Wno-error")
+   if(EXPAT_INSTALL_STATIC_LIBS)
+     target_compile_options(expat_static PRIVATE "-Wno-error")
+   endif(EXPAT_INSTALL_STATIC_LIBS)
+ endif()
+
+ install(TARGETS expat EXPORT expatTargets
+     ARCHIVE DESTINATION lib
+     LIBRARY DESTINATION lib
+     RUNTIME DESTINATION bin
+ )
++if(EXPAT_INSTALL_STATIC_LIBS)
++  install(TARGETS expat_static EXPORT expatTargets
++      ARCHIVE DESTINATION lib
++      LIBRARY DESTINATION lib
++      RUNTIME DESTINATION bin
++  )
++endif(EXPAT_INSTALL_STATIC_LIBS)
+ install(EXPORT expatTargets DESTINATION lib/cmake/expat)
