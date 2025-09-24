@@ -37,16 +37,7 @@ index abc123def..def456ghi 100644
  if(EXPAT_INSTALL_STATIC_LIBS)
    target_include_directories(expat_static
       PRIVATE
-@@ -61,11 +70,13 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR
-   # turn off warnings as errors, this throws a bunch
-   target_compile_options(expat PRIVATE "-Wno-error")
-   if(EXPAT_INSTALL_STATIC_LIBS)
-     target_compile_options(expat_static PRIVATE "-Wno-error")
-   endif(EXPAT_INSTALL_STATIC_LIBS)
- endif()
-
- install(TARGETS expat EXPORT expatTargets
-     ARCHIVE DESTINATION lib
+@@ -67,6 +76,14 @@ install(TARGETS expat EXPORT expatTargets
      LIBRARY DESTINATION lib
      RUNTIME DESTINATION bin
  )
