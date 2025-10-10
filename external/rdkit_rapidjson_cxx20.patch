@@ -1,17 +1,48 @@
-diff --git a/External/rapidjson/rapidjson-1.1.0/include/rapidjson/document.h b/External/rapidjson/rapidjson-1.1.0/include/rapidjson/document.h
-index 000000000..111111111 100644
---- a/External/rapidjson/rapidjson-1.1.0/include/rapidjson/document.h
-+++ b/External/rapidjson/rapidjson-1.1.0/include/rapidjson/document.h
-@@ -316,7 +316,10 @@ private:
-
-     //! Copy assignment is not permitted.
-     GenericStringRef& operator=(const GenericStringRef& rhs) = delete;
--    GenericStringRef& operator=(const GenericStringRef& rhs) { s = rhs.s; length = rhs.length; }
-+    GenericStringRef& operator=(const GenericStringRef& rhs) {
-+        const_cast<CharType*&>(s) = rhs.s;
-+        const_cast<SizeType&>(length) = rhs.length;
-+        return *this;
-+    }
-
-     const CharType* s; //!< plain CharType pointer
-     const SizeType length; //!< length of the string (excluding the trailing NULL terminator)
+diff --git a/External/rapidjson/patch-rapidjson-1.1.0.diff b/External/rapidjson/patch-rapidjson-1.1.0.diff
+index 3c8097ed6..0bdb020a5 100644
+--- a/External/rapidjson/patch-rapidjson-1.1.0.diff
++++ b/External/rapidjson/patch-rapidjson-1.1.0.diff
+@@ -8,12 +8,12 @@
+ +#include <algorithm>
+  #include <new>      // placement new
+  #include <limits>
+- 
++
+ @@ -68,9 +70,48 @@
+      https://code.google.com/p/rapidjson/issues/detail?id=64
+  */
+- template <typename Encoding, typename Allocator> 
+--struct GenericMember { 
++ template <typename Encoding, typename Allocator>
++-struct GenericMember {
+ +class GenericMember {
+ +public:
+ +    // Allow default construction as it is needed during copying.
+@@ -57,17 +57,22 @@
+ +    //! Copy constructor is not permitted.
+ +    GenericMember(const GenericMember& rhs);
+  };
+- 
++
+  ///////////////////////////////////////////////////////////////////////////////
+ @@ -316,8 +357,6 @@
+- 
++
+      GenericStringRef(const GenericStringRef& rhs) : s(rhs.s), length(rhs.length) {}
+- 
++
+ -    GenericStringRef& operator=(const GenericStringRef& rhs) { s = rhs.s; length = rhs.length; }
+--
+++    GenericStringRef& operator=(const GenericStringRef& rhs) {
+++        const_cast<CharType*&>(s) = rhs.s;
+++        const_cast<SizeType&>(length) = rhs.length;
+++        return *this;
+++    }
++
+      //! implicit conversion to plain CharType pointer
+      operator const Ch *() const { return s; }
+- 
++
+ @@ -1934,9 +1973,11 @@
+      void SetArrayRaw(GenericValue* values, SizeType count, Allocator& allocator) {
+          data_.f.flags = kArrayFlag;
