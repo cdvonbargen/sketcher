@@ -1,0 +1,17 @@
+diff --git a/External/rapidjson/rapidjson-1.1.0/include/rapidjson/document.h b/External/rapidjson/rapidjson-1.1.0/include/rapidjson/document.h
+index 000000000..111111111 100644
+--- a/External/rapidjson/rapidjson-1.1.0/include/rapidjson/document.h
++++ b/External/rapidjson/rapidjson-1.1.0/include/rapidjson/document.h
+@@ -316,7 +316,10 @@ private:
+
+     //! Copy assignment is not permitted.
+     GenericStringRef& operator=(const GenericStringRef& rhs) = delete;
+-    GenericStringRef& operator=(const GenericStringRef& rhs) { s = rhs.s; length = rhs.length; }
++    GenericStringRef& operator=(const GenericStringRef& rhs) {
++        const_cast<CharType*&>(s) = rhs.s;
++        const_cast<SizeType&>(length) = rhs.length;
++        return *this;
++    }
+
+     const CharType* s; //!< plain CharType pointer
+     const SizeType length; //!< length of the string (excluding the trailing NULL terminator)
