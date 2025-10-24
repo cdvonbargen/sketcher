@@ -387,9 +387,8 @@ const int CURSOR_HINT_IMAGE_SIZE = 28 * CURSOR_SCALE;
 const QColor LIGHT_CURSOR_COLOR = DARK_BACKGROUND_COLOR;
 const QColor DARK_CURSOR_COLOR = LIGHT_BACKGROUND_COLOR;
 
-// The maximum number of atoms that can be imported at once. Attempting to
-// import a molecule or reaction with too many atoms will result in an error
-// dialog informing the user of the problem.
+// The maximum number of atoms for which importing is done silently.
+// Importing a molecule with more atoms shows a performance warning dialog.
 const unsigned int MAX_NUM_ATOMS_FOR_IMPORT = 200;
 
 // maximum allowed values for spin boxes in the Edit Aom Properties dialog

@@ -631,6 +631,17 @@ void Scene::onModelValuesChanged(const std::unordered_set<ModelKey>& keys)
             case ModelKey::NUCLEIC_ACID_TOOL:
                 updateSceneTool();
                 break;
+            case ModelKey::SHOW_STEREO_LABELS: {
+                auto calc = m_sketcher_model->getValueBool(key);
+                // Block modelChanged so the scene update is driven solely by
+                // onDisplaySettingsChanged below, avoiding a double repaint.
+                {
+                    QSignalBlocker blocker(m_mol_model);
+                    m_mol_model->setCalculateStereoOnChange(calc);
+                }
+                onDisplaySettingsChanged();
+                break;
+            }
             default:
                 break;
         }

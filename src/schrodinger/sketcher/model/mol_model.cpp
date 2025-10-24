@@ -221,10 +221,16 @@ const RDKit::ROMol* MolModel::getMol() const
 boost::shared_ptr<RDKit::ROMol> MolModel::getMolForExport() const
 {
     // TODO: add API to export selection as atom/bond properties
-    auto mol_copy = boost::make_shared<RDKit::ROMol>(m_mol);
+    auto mol_copy = boost::make_shared<RDKit::RWMol>(m_mol);
     if (contains_monomeric_atom(m_mol)) {
         // RDKit uses a mol-level property to indicate HELM mols
         mol_copy->setProp(HELM_MODEL, true);
+    }
+    if (!m_calculate_stereo) {
+        // Stereo perception was disabled for performance (e.g., user turned off
+        // stereocenter labels for a large molecule). Recalculate on the copy so
+        // the exported structure has correct chirality.
+        update_molecule_on_change(*mol_copy, true);
     }
     strip_notes_and_mol_model_tags(*mol_copy);
     return mol_copy;
@@ -504,6 +510,20 @@ MolModel::getNonMolecularObjects() const
     return objs;
 }
 
+void MolModel::setCalculateStereoOnChange(bool calculate_stereo)
+{
+    m_calculate_stereo = calculate_stereo;
+    if (m_calculate_stereo) { // if turned back on, force a stereo update
+        update_molecule_on_change(m_mol, m_calculate_stereo);
+        // Notify observers (e.g., Scene) that molecule metadata has changed
+        // Need to temporarily unblock signals since this is called outside
+        // of a command execution context
+        bool was_blocked = blockSignals(false);
+        emit modelChanged(WhatChanged::MOLECULE);
+        blockSignals(was_blocked);
+    }
+}
+
 void MolModel::doCommandUsingSnapshots(const std::function<void()> do_func,
                                        const QString& description,
                                        const WhatChangedType to_be_changed)
@@ -513,7 +533,7 @@ void MolModel::doCommandUsingSnapshots(const std::function<void()> do_func,
     m_allow_edits = true;
     do_func();
     if (to_be_changed & WhatChanged::MOLECULE) {
-        update_molecule_on_change(m_mol);
+        update_molecule_on_change(m_mol, m_calculate_stereo);
     }
     // We don't need to call updateNonMolecularMetadata here since
     // m_tag_to_non_molecular_object (which is what updateNonMolecularMetadata
@@ -2832,7 +2852,7 @@ void MolModel::setCoordinates(
     // update_molecule_on_change handles stereochemistry perception, CIP label
     // assignment, and S-group bracket updates. This ensures stereo labels
     // update in real-time as atoms are moved (SKETCH-2590).
-    update_molecule_on_change(m_mol);
+    update_molecule_on_change(m_mol, m_calculate_stereo);
 
     emit coordinatesChanged();
 }
@@ -2998,12 +3018,12 @@ void add_mol_or_reaction_to_mol_model(
             mol_model.addMolAt(*mol, *position, "Import molecule");
         } else {
             mol_model.addMol(*mol, "Import molecule", /*reposition_mol =*/true,
-                             recenter_view);
+                             recenter_view, /*enforce_size_limit =*/false);
         }
     } else {
         auto reaction = std::get<boost::shared_ptr<RDKit::ChemicalReaction>>(
             mol_or_reaction);
-        mol_model.addReaction(*reaction);
+        mol_model.addReaction(*reaction, /*enforce_size_limit =*/false);
     }
 }
 

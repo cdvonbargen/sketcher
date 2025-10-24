@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include <fmt/format.h>
+
 #include <QApplication>
 #include <QClipboard>
 #include <QCursor>
@@ -595,6 +597,16 @@ void SketcherWidget::importText(const std::string& text, Format format)
         addFromString(text, format);
     } catch (const std::exception& exc) {
         show_error_dialog("Import Error", exc.what(), window());
+    }
+
+    auto TOO_MANY_ATOMS_WARNING = QString::fromStdString(fmt::format(
+        "This structure exceeds the recommended maximum number of atoms for "
+        "the 2D sketcher ({}).\n\nTo avoid significant delays when interacting "
+        "with this structure, we recommend turning off the \"Stereocenter "
+        "Labels\" option in the Settings menu (Gear icon).",
+        MAX_NUM_ATOMS_FOR_IMPORT));
+    if (m_mol_model->getMol()->getNumAtoms() > MAX_NUM_ATOMS_FOR_IMPORT) {
+        show_error_dialog("Too Many Atoms", TOO_MANY_ATOMS_WARNING, window());
     }
 }
 
