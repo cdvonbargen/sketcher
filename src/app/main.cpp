@@ -36,6 +36,12 @@ void sketcher_import_text(const std::string& text)
     sk.addFromString(text);
 }
 
+void sketcher_import_text_with_format(const std::string& text, Format format)
+{
+    auto& sk = get_sketcher_instance();
+    sk.addFromString(text, format);
+}
+
 std::string sketcher_export_text(Format format)
 {
     auto& sk = get_sketcher_instance();
@@ -115,6 +121,7 @@ EMSCRIPTEN_BINDINGS(sketcher)
         .value("SVG", ImageFormat::SVG);
 
     emscripten::function("sketcher_import_text", &sketcher_import_text);
+    emscripten::function("sketcher_import_text_with_format", &sketcher_import_text_with_format);
     emscripten::function("sketcher_export_text", &sketcher_export_text);
     emscripten::function("sketcher_export_image", &sketcher_export_image);
     emscripten::function("sketcher_clear", &sketcher_clear);

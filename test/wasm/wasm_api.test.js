@@ -65,11 +65,17 @@ test.describe('WASM Sketcher API', () => {
       const inputText = fs.readFileSync(snapshotPath, 'utf8');
 
       // Import and verify the sketcher is not empty
-      const importSuccessful = await page.evaluate((inputText) => {
+      // For FASTA variants, use explicit format since auto-detection can't distinguish them
+      const importSuccessful = await page.evaluate(({ inputText, format }) => {
         Module.sketcher_clear();
-        Module.sketcher_import_text(inputText);
+        const needsExplicitFormat = ['FASTA_PEPTIDE', 'FASTA_DNA', 'FASTA_RNA'].includes(format);
+        if (needsExplicitFormat) {
+          Module.sketcher_import_text_with_format(inputText, Module.Format[format]);
+        } else {
+          Module.sketcher_import_text(inputText);
+        }
         return !Module.sketcher_is_empty();
-      }, inputText);
+      }, { inputText, format });
       expect(importSuccessful).toBe(true);
     });
   });
