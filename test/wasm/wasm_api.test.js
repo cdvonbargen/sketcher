@@ -55,10 +55,12 @@ test.describe('WASM Sketcher API', () => {
     test(`importing ${format}`, async ({ page }, testInfo) => {
       test.skip(!!importUnsupported, `${format} does not support import`);
 
-      // Read the snapshot file
+      // Read the snapshot file from our custom snapshot directory
+      // Playwright converts underscores to hyphens in snapshot names
       const snapshotPath = path.join(
-        testInfo.snapshotDir,
-        `text-${format}.txt`
+        '__snapshots__',
+        'wasm_api.test.js',
+        `text-${format.replace(/_/g, '-')}.txt`
       );
       const inputText = fs.readFileSync(snapshotPath, 'utf8');
 
