@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
 
 test.describe('WASM Sketcher API', () => {
   test.beforeEach(async ({ page }) => {
@@ -54,8 +56,6 @@ test.describe('WASM Sketcher API', () => {
       test.skip(!!importUnsupported, `${format} does not support import`);
 
       // Read the snapshot file
-      const fs = require('fs');
-      const path = require('path');
       const snapshotPath = path.join(
         testInfo.snapshotDir,
         `text-${format}.txt`
