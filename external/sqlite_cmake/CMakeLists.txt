@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.24)
-project(SQLite3 LANGUAGES C)
+
+# Use version passed from parent build, or default to 3.42.0
+if(NOT SQLITE_SEMANTIC_VERSION)
+    set(SQLITE_SEMANTIC_VERSION "3.42.0")
+endif()
+
+project(SQLite3 VERSION ${SQLITE_SEMANTIC_VERSION} LANGUAGES C)
 
 # Build static SQLite library from amalgamation
 add_library(sqlite3 STATIC sqlite3.c)
@@ -71,6 +77,7 @@ configure_package_config_file(
 
 write_basic_package_version_file(
     ${CMAKE_CURRENT_BINARY_DIR}/SQLite3ConfigVersion.cmake
+    VERSION ${SQLITE_SEMANTIC_VERSION}
     COMPATIBILITY SameMajorVersion
 )
 
