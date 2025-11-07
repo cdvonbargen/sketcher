@@ -106,11 +106,18 @@ ExternalProject_Add(
     -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/eigen-${EIGEN_VERSION})
 
 # Build SQLite library
+# Download the official amalgamation from sqlite.org
 ExternalProject_Add(
   sqlite
-  GIT_REPOSITORY https://github.com/algoritnl/sqlite-amalgamation.git
-  GIT_TAG version-${SQLITE_VERSION}
-  GIT_SHALLOW TRUE
+  DEPENDS zlib
+  URL https://www.sqlite.org/2023/sqlite-amalgamation-${SQLITE_VERSION}.zip
+  DOWNLOAD_NO_PROGRESS TRUE
+  PATCH_COMMAND ${CMAKE_COMMAND} -E copy
+                ${CMAKE_CURRENT_SOURCE_DIR}/sqlite_cmake/CMakeLists.txt
+                <SOURCE_DIR>/CMakeLists.txt
+          COMMAND ${CMAKE_COMMAND} -E copy
+                ${CMAKE_CURRENT_SOURCE_DIR}/sqlite_cmake/SQLite3Config.cmake.in
+                <SOURCE_DIR>/SQLite3Config.cmake.in
   CMAKE_ARGS
     ${COMMON_EXTERNAL_PROJECT_CMAKE_ARGS}
     -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/sqlite-${SQLITE_VERSION}
