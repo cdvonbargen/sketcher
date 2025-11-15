@@ -13,6 +13,10 @@ runs:
       run: |
         git checkout ${{ inputs.branch }}
         current_version=$(jq -r '.sketcher' external/versions.json)
+        if [ "$current_version" = "null" ] || [ -z "$current_version" ]; then
+          echo "Error: 'sketcher' field not found in external/versions.json"
+          exit 1
+        fi
         new_version=$(echo $current_version | awk -F. '{print $1"."$2"."($3+1)}')
         jq --arg version "$new_version" '.sketcher = $version' external/versions.json > versions.json.tmp
         mv versions.json.tmp external/versions.json
