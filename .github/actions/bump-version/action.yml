@@ -12,10 +12,10 @@ runs:
       shell: bash
       run: |
         git checkout ${{ inputs.branch }}
-        current_version=$(jq -r '.sketcher' versions.json)
+        current_version=$(jq -r '.sketcher' external/versions.json)
         new_version=$(echo $current_version | awk -F. '{print $1"."$2"."($3+1)}')
-        jq --arg version "$new_version" '.sketcher = $version' versions.json > versions.json.tmp
-        mv versions.json.tmp versions.json
-        git add versions.json
+        jq --arg version "$new_version" '.sketcher = $version' external/versions.json > versions.json.tmp
+        mv versions.json.tmp external/versions.json
+        git add external/versions.json
         git commit -m "Increment to build $new_version"
         git push origin ${{ inputs.branch }}
