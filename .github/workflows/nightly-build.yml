@@ -26,11 +26,11 @@ jobs:
           git config --local user.email "action@github.com"
           git remote set-url origin https://x-access-token:${{ inputs.token }}@github.com/${{ github.repository }}.git
 
-      - name: Bump version on release branch
-        if: inputs.release-branch != ''
-        uses: ./.github/actions/bump-version
-        with:
-          branch: ${{ inputs.release-branch }}
+    #   - name: Bump version on release branch
+    #     if: inputs.release-branch != ''
+    #     uses: ./.github/actions/bump-version
+    #     with:
+    #       branch: ${{ inputs.release-branch }}
 
       - name: Merge release branch into main
         if: inputs.release-branch != ''
