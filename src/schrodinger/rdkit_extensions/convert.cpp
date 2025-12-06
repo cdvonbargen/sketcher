@@ -588,8 +588,10 @@ boost::shared_ptr<RDKit::RWMol> to_rdkit(const std::string& text,
                 // Attempt SMILES before SMARTS, given not all SMARTS are SMILES
                 Format::SMILES,
                 Format::SMARTS,
-                // Guess at HELM after guessing atomistic formats
+                // Guess at monomer formats after guessing atomistic formats
                 Format::HELM,
+                // Assume peptide FASTA since there's no way to guess otherwise
+                Format::FASTA_PEPTIDE,
             },
             &to_rdkit);
     }
