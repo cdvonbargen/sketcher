@@ -245,6 +245,21 @@ if(MSVC AND NOT ${BUILD_SHARED_LIBS})
     ${APP_TARGET} PROPERTIES IMPORT_SUFFIX _bin${CMAKE_IMPORT_LIBRARY_SUFFIX})
 endif()
 
+# Copy over the necessary WASM files into the application directory
+if(EMSCRIPTEN)
+  add_custom_target(
+    update_wasm_files
+    DEPENDS ${APP_TARGET}
+    COMMAND
+      ${CMAKE_COMMAND} -E copy_if_different
+      ${QT_HOST_PATH}/plugins/platforms/qtloader.js
+      ${CMAKE_BINARY_DIR}/sketcher_app/qtloader.js
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/wasm/public/
+            ${CMAKE_BINARY_DIR}/sketcher_app/
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/wasm/update_cache_bust.py --wasm-dir
+            ${CMAKE_BINARY_DIR}/sketcher_app --app-target ${APP_TARGET})
+endif()
+
 # Tests
 if(ENABLE_TESTING)
   enable_testing()
