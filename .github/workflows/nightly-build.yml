@@ -1,0 +1,28 @@
+name: Nightly Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      release-branch:
+        description: '[Optional] Release branch to build'
+        required: false
+        type: string
+      dry-run:
+        description: 'Skip npm publishing'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build-release-branch:
+    if: (!cancelled() && inputs.release-branch != '')
+    uses: ./.github/workflows/sketcher-builder.yml
+    with:
+      ref: ${{ inputs.release-branch }}
+      publish-npm-package: ${{ !inputs.dry-run }}
+
+  build-main-branch:
+    uses: ./.github/workflows/sketcher-builder.yml
+    with:
+      ref: main
+      publish-npm-package: ${{ !inputs.dry-run }}
