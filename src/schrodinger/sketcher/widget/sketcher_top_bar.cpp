@@ -95,23 +95,24 @@ void SketcherTopBar::initMenus()
             &SketcherTopBar::copyRequested);
     connect(m_more_actions_menu->m_paste_act, &QAction::triggered, this,
             &SketcherTopBar::pasteRequested);
-    connect(m_more_actions_menu->m_flip_horizontal_act, &QAction::triggered,
-            this, &SketcherTopBar::flipHorizontalRequested,
-            Qt::QueuedConnection);
-    connect(m_more_actions_menu->m_flip_vertical_act, &QAction::triggered, this,
-            &SketcherTopBar::flipVerticalRequested, Qt::QueuedConnection);
-    connect(m_more_actions_menu->m_add_explicit_hydrogens_act,
-            &QAction::triggered, this,
-            &SketcherTopBar::addExplicitHydrogensRequested,
-            Qt::QueuedConnection);
-    connect(m_more_actions_menu->m_aromatize_act, &QAction::triggered, this,
-            &SketcherTopBar::aromatizeRequested, Qt::QueuedConnection);
-    connect(m_more_actions_menu->m_kekulize_act, &QAction::triggered, this,
-            &SketcherTopBar::kekulizeRequested, Qt::QueuedConnection);
-    connect(m_more_actions_menu->m_remove_explicit_hydrogens_act,
-            &QAction::triggered, this,
-            &SketcherTopBar::removeExplicitHydrogensRequested,
-            Qt::QueuedConnection);
+    connect(
+        m_more_actions_menu->m_modify_structure_menu, &QMenu::triggered, this,
+        [this](QAction* action) {
+            auto* m = m_more_actions_menu;
+            if (action == m->m_flip_horizontal_act)
+                emit flipHorizontalRequested();
+            else if (action == m->m_flip_vertical_act)
+                emit flipVerticalRequested();
+            else if (action == m->m_add_explicit_hydrogens_act)
+                emit addExplicitHydrogensRequested();
+            else if (action == m->m_remove_explicit_hydrogens_act)
+                emit removeExplicitHydrogensRequested();
+            else if (action == m->m_aromatize_act)
+                emit aromatizeRequested();
+            else if (action == m->m_kekulize_act)
+                emit kekulizeRequested();
+        },
+        Qt::QueuedConnection);
     connect(m_more_actions_menu->m_add_custom_fragment_act, &QAction::triggered,
             this, &SketcherTopBar::onAddCustomFragmentClicked);
     connect(m_more_actions_menu->m_fit_to_screen_act, &QAction::triggered, this,

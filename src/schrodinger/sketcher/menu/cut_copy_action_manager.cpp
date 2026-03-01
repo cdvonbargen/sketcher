@@ -1,6 +1,8 @@
 
 #include "schrodinger/sketcher/menu/cut_copy_action_manager.h"
 
+#include <QHash>
+
 #include "schrodinger/rdkit_extensions/convert.h"
 #include "schrodinger/sketcher/dialog/file_import_export.h"
 #include "schrodinger/sketcher/model/sketcher_model.h"
@@ -65,17 +67,17 @@ SceneSubset CutCopyActionManager::getSubset()
 
 void CutCopyActionManager::initCopyAsMenu()
 {
+    QHash<QAction*, Format> format_actions;
+
     auto init_menu = [&](const auto& format_list, bool is_reaction_format) {
         for (const auto& format : format_list) {
             // Clang < 16 does not allow capturing structured bindings, so
             // we'll extract "manually".
             auto& fmt = std::get<0>(format);
             auto& label = std::get<1>(format);
-            auto slot = [this, fmt]() { emit copyRequested(fmt, getSubset()); };
             auto action =
                 m_copy_as_menu->addAction(QString::fromStdString(label));
-            connect(action, &QAction::triggered, this, slot,
-                    Qt::QueuedConnection);
+            format_actions[action] = fmt;
             // set a flag on the action to determine its visibility later
             action->setData(QVariant(is_reaction_format));
         }
@@ -86,13 +88,21 @@ void CutCopyActionManager::initCopyAsMenu()
 
     // Add a separator and the option to export as an image
     auto separator = m_copy_as_menu->addSeparator();
-    auto action = m_copy_as_menu->addAction("Image");
-    connect(
-        action, &QAction::triggered, this,
-        [this]() { emit copyAsImageRequested(); }, Qt::QueuedConnection);
+    auto image_action = m_copy_as_menu->addAction("Image");
     // export as image should only be allowed for full scene
     m_hide_for_selections.push_back(separator);
-    m_hide_for_selections.push_back(action);
+    m_hide_for_selections.push_back(image_action);
+
+    connect(
+        m_copy_as_menu, &QMenu::triggered, this,
+        [this, format_actions, image_action](QAction* action) {
+            if (action == image_action) {
+                emit copyAsImageRequested();
+            } else if (format_actions.contains(action)) {
+                emit copyRequested(format_actions[action], getSubset());
+            }
+        },
+        Qt::QueuedConnection);
 }
 
 void CutCopyActionManager::updateActions()
