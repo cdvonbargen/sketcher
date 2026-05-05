@@ -68,8 +68,9 @@ void assign_stereochemistry(RDKit::ROMol& mol)
          RDKit::Chirality::findPotentialStereo(mol, /*cleanIt=*/false)) {
         if (si.type == RDKit::Chirality::StereoType::Bond_Double &&
             si.specified == RDKit::Chirality::StereoSpecified::Unspecified) {
-            mol.getBondWithIdx(si.centeredOn)
-                ->setBondDir(RDKit::Bond::BondDir::EITHERDOUBLE);
+            auto bond = mol.getBondWithIdx(si.centeredOn);
+            bond->setBondDir(RDKit::Bond::BondDir::EITHERDOUBLE);
+            bond->setStereo(RDKit::Bond::BondStereo::STEREOANY);
         }
     }
 }

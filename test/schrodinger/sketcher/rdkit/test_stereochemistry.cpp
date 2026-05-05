@@ -121,8 +121,9 @@ BOOST_AUTO_TEST_CASE(test_assign_stereochemistry_marks_unspecified_double_bond)
 
     rdkit_extensions::assign_stereochemistry(*mol);
 
-    BOOST_TEST(mol->getBondBetweenAtoms(1, 2)->getBondDir() ==
-               RDKit::Bond::BondDir::EITHERDOUBLE);
+    auto bond = mol->getBondBetweenAtoms(1, 2);
+    BOOST_TEST(bond->getBondDir() == RDKit::Bond::BondDir::EITHERDOUBLE);
+    BOOST_TEST(bond->getStereo() == RDKit::Bond::BondStereo::STEREOANY);
 }
 
 } // namespace sketcher
