@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -74,12 +75,24 @@ struct RDKIT_EXTENSIONS_API ResidueQuery {
     }
 };
 
+/// A custom monomer is uniquely identified by it chain type (PEPTIDE, RNA,
+/// CHEM...) and symbol. For example, there can be both a PEPTIDE "A" (alanine)
+/// and an RNA "A" (adenine).
+struct RDKIT_EXTENSIONS_API MonomerID {
+    std::string symbol;
+    ChainType chain_type;
+};
+
 class RDKIT_EXTENSIONS_API MonomerDatabase : public boost::noncopyable
 {
   public:
     // (HELM symbol, smiles, chain type)
     using helm_info_t =
         std::optional<std::tuple<std::string, std::string, ChainType>>;
+    using monomer_smiles_t = std::pair<std::string, MonomerID>;
+    using all_smiles_t = std::vector<monomer_smiles_t>;
+    using enumerated_core_smiles_map_t =
+        std::unordered_map<std::string, MonomerID>;
 
     // Get the current DB instance. It will always contain an
     // up-to-date table with our core monomer, and MAY contain
@@ -160,12 +173,12 @@ class RDKIT_EXTENSIONS_API MonomerDatabase : public boost::noncopyable
     // to make sure the SMILES strings are correctly canonicalized.
     void canonicalizeSmilesFields(bool include_core = false);
 
-    [[nodiscard]] std::vector<std::pair<std::string, std::string>>
-    getAllSMILES() const;
+    [[nodiscard]] all_smiles_t getAllSMILES() const;
 
-    // Return a cached map from enumerated core SMILES to monomer symbols.
+    // Return a cached map from enumerated core SMILES to monomer symbol and
+    // chain type.
     // The cache is invalidated whenever the database is modified.
-    [[nodiscard]] const std::unordered_map<std::string, std::string>&
+    [[nodiscard]] const enumerated_core_smiles_map_t&
     getEnumeratedCoreSmiles() const;
 
     // Returns non-natural monomers grouped by their natural analog symbol.
@@ -202,8 +215,8 @@ class RDKIT_EXTENSIONS_API MonomerDatabase : public boost::noncopyable
     sqlite3* m_core_monomers_db = nullptr;
     sqlite3* m_custom_monomers_db = nullptr;
 
-    // Cache for enumerated core SMILES to monomer symbol mapping
-    mutable std::optional<std::unordered_map<std::string, std::string>>
+    // Cache for enumerated core SMILES to monomer symbol and chain type.
+    mutable std::optional<enumerated_core_smiles_map_t>
         m_enumerated_core_smiles_cache;
 
     // Cache for complex monomer queries
