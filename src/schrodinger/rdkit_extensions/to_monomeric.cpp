@@ -2141,6 +2141,15 @@ smartsBasedToMonomeric(RDKit::RWMol& atomistic_mol, bool complex_mode)
 
 auto make_atomistic_mol = [](auto& input_mol) {
     RDKit::RWMol new_atomistic_mol(input_mol);
+    new_atomistic_mol.beginBatchEdit();
+    for (const auto* bond : new_atomistic_mol.bonds()) {
+        if (bond->getBondType() == RDKit::Bond::ZERO) {
+            new_atomistic_mol.removeBond(bond->getBeginAtomIdx(),
+                                         bond->getEndAtomIdx());
+        }
+    }
+    new_atomistic_mol.commitBatchEdit();
+
     // Set reference index for SMILES fragments
     for (auto at : new_atomistic_mol.atoms()) {
         at->setProp(REFERENCE_IDX, at->getIdx());
