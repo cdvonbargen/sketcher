@@ -998,14 +998,14 @@ void MonomerDatabase::canonicalizeSmilesFields(bool include_core)
     invalidateCache();
 }
 
-[[nodiscard]] std::vector<std::pair<std::string, std::string>>
+[[nodiscard]] MonomerDatabase::all_smiles_t
 MonomerDatabase::getAllSMILES() const
 {
     static constexpr const char* sql =
-        "SELECT SMILES, SYMBOL FROM monomer_definitions WHERE "
-        "POLYMER_TYPE='PEPTIDE' ORDER BY id ASC;";
+        "SELECT SMILES, SYMBOL, POLYMER_TYPE FROM monomer_definitions WHERE "
+        "POLYMER_TYPE IN ('PEPTIDE', 'CHEM') ORDER BY id ASC;";
 
-    std::vector<std::pair<std::string, std::string>> ret;
+    all_smiles_t ret;
 
     for (sqlite3* db : {m_core_monomers_db, m_custom_monomers_db}) {
         if (db == nullptr) {
@@ -1020,8 +1020,10 @@ MonomerDatabase::getAllSMILES() const
 
                 auto smiles = _sqlite3_column_cstring(stmt, 0);
                 auto symbol = _sqlite3_column_cstring(stmt, 1);
+                auto polymer_type = _sqlite3_column_cstring(stmt, 2);
 
-                ret.emplace_back(smiles, symbol);
+                ret.emplace_back(smiles,
+                                 MonomerID{symbol, toChainType(polymer_type)});
             }
         }
     }
@@ -1029,17 +1031,18 @@ MonomerDatabase::getAllSMILES() const
     return ret;
 }
 
-const std::unordered_map<std::string, std::string>&
+const MonomerDatabase::enumerated_core_smiles_map_t&
 MonomerDatabase::getEnumeratedCoreSmiles() const
 {
     if (!m_enumerated_core_smiles_cache.has_value()) {
         schrodinger::rdkit_extensions::CaptureRDErrorLog rdkit_log;
-        std::unordered_map<std::string, std::string> core_smiles_to_monomer;
+        enumerated_core_smiles_map_t core_smiles_to_monomer;
 
-        for (auto& [smiles, symbol] : getAllSMILES()) {
+        for (const auto& [smiles, monomer_id] : getAllSMILES()) {
             for (auto&& enumerated_smiles : enumerate_smiles(smiles)) {
-                // Note: If there are duplicates, the later entry will overwrite
-                core_smiles_to_monomer[enumerated_smiles] = symbol;
+                // Note: If there are duplicates, the later entry will
+                // overwrite the previous one.
+                core_smiles_to_monomer[enumerated_smiles] = monomer_id;
             }
         }
 
@@ -1070,7 +1073,7 @@ boost::shared_ptr<RDKit::RWMol> make_query(const RDKit::ROMol& mol,
 
     // Create a query for oxygen or nitrogen atoms
     static auto o_n_query_mol =
-        std::unique_ptr<RDKit::ROMol>(RDKit::SmartsToMol("[O,N]"));
+        std::unique_ptr<RDKit::ROMol>(RDKit::SmartsToMol("*"));
     auto o_n_query = o_n_query_mol->getAtomWithIdx(0);
 
     rwmol->beginBatchEdit();
@@ -1180,7 +1183,7 @@ MonomerDatabase::getComplexMonomerQueries() const
     if (!m_complex_monomer_queries.has_value()) {
         auto queries = std::vector<ResidueQuery>();
         RDKit::MatchVectType res;
-        for (auto& [smiles, symbol] : getAllSMILES()) {
+        for (const auto& [smiles, monomer_id] : getAllSMILES()) {
             constexpr int debug = 0;
             constexpr bool sanitize = false;
             std::unique_ptr<RDKit::RWMol> mol(
@@ -1197,7 +1200,7 @@ MonomerDatabase::getComplexMonomerQueries() const
                     RDKit::MolOps::sanitizeMol(*can_tautomer);
                     query.mol = make_query(*can_tautomer, can_smiles);
                     query.attch_map = make_attch_map(*query.mol);
-                    query.name = symbol;
+                    query.name = monomer_id.symbol;
                     query.use_chirality = true;
                     queries.push_back(query);
                 }

@@ -197,27 +197,27 @@ void decorateFragment(RDKit::RWMol& mol_fragment, const MonomerMatch& monomer,
 
 // Search for the mol_fragment in the database. The fragment should have
 // dummy atoms next to the attachment points and not have a terminal atom.
-std::optional<std::string> findHelmSymbol(const RDKit::ROMol& mol_fragment)
+std::optional<MonomerID> findHelmSymbol(const RDKit::ROMol& mol_fragment)
 {
-    const auto& amino_acids =
+    const auto& monomers_by_smiles =
         MonomerDatabase::instance().getEnumeratedCoreSmiles();
 
     auto monomer_smiles = RDKit::MolToSmiles(mol_fragment, true);
     PRINT("  monomer_smiles: {}\n", monomer_smiles);
 
-    if (auto result = amino_acids.find(monomer_smiles);
-        result != amino_acids.end()) {
-        auto& monomer_symbol = result->second;
-        PRINT("  matched symbol: {}\n", monomer_symbol);
-        return monomer_symbol;
+    if (auto result = monomers_by_smiles.find(monomer_smiles);
+        result != monomers_by_smiles.end()) {
+        auto& monomer_id = result->second;
+        PRINT("  matched symbol: {}\n", monomer_id.symbol);
+        return monomer_id;
     }
 
     PRINT("  no match\n");
     return std::nullopt;
 }
 
-std::optional<std::string> findHelmSymbol(const RDKit::ROMol& atomistic_mol,
-                                          const MonomerMatch& monomer)
+std::optional<MonomerID> findHelmSymbol(const RDKit::ROMol& atomistic_mol,
+                                        const MonomerMatch& monomer)
 {
     PRINT("findHelmSymbol {}\n", fmt::join(monomer.atom_indices, " "));
     PRINT("  rs: {} {} {} {}\n", monomer.r1, monomer.r2, monomer.r3,
@@ -228,8 +228,8 @@ std::optional<std::string> findHelmSymbol(const RDKit::ROMol& atomistic_mol,
             auto mol_fragment =
                 ExtractMolFragment(atomistic_mol, monomer.atom_indices, false);
             decorateFragment(*mol_fragment, monomer, with_r1, remove_terminal);
-            if (auto symbol = findHelmSymbol(*mol_fragment); symbol) {
-                return symbol;
+            if (auto monomer_id = findHelmSymbol(*mol_fragment); monomer_id) {
+                return monomer_id;
             }
         }
     }
@@ -1126,8 +1126,8 @@ buildMonomerMol(const RDKit::ROMol& atomistic_mol,
     // structure into a single CHEM smiles monomer.
     if (monomers.size() == 1) {
         auto& monomer = monomers.front();
-        auto helm_symbol = findHelmSymbol(atomistic_mol, monomer);
-        if (!helm_symbol && allow_smiles) {
+        auto monomer_id = findHelmSymbol(atomistic_mol, monomer);
+        if (!monomer_id && allow_smiles) {
             addMonomer(*monomer_mol, RDKit::MolToSmiles(atomistic_mol), 1,
                        "CHEM1", MonomerType::SMILES);
             return monomer_mol;
@@ -1142,14 +1142,21 @@ buildMonomerMol(const RDKit::ROMol& atomistic_mol,
             residue_num = 1;
             prev_chain_idx = monomer.chain_idx;
         }
-        auto chain_id = fmt::format("PEPTIDE{}", monomer.chain_idx);
-        auto helm_symbol = findHelmSymbol(atomistic_mol, monomer);
+        auto monomer_id = findHelmSymbol(atomistic_mol, monomer);
+        auto chain_id =
+            monomer_id ? fmt::format("{}{}", toString(monomer_id->chain_type),
+                                     monomer.chain_idx)
+                       : fmt::format("PEPTIDE{}", monomer.chain_idx);
 
-        // If the monomer is a known amino acid, use the 1-letter code
-        if (helm_symbol) {
-            PRINT("addMonomer({}, {}:{})\n", *helm_symbol, monomer.chain_idx,
-                  residue_num);
-            addMonomer(*monomer_mol, *helm_symbol, residue_num, chain_id);
+        // If the monomer is known, use its monomer database symbol.
+        if (monomer_id) {
+            if (monomer_id->chain_type == ChainType::CHEM && !allow_smiles) {
+                throw std::runtime_error(
+                    "Found a CHEM monomer; retry in complex mode");
+            }
+            PRINT("addMonomer({}, {}:{})\n", monomer_id->symbol,
+                  monomer.chain_idx, residue_num);
+            addMonomer(*monomer_mol, monomer_id->symbol, residue_num, chain_id);
         } else if (allow_smiles) {
             // We need to add R1/R2 attachment points to the monomer
             RDKit::RWMol atomistic_copy(atomistic_mol);
@@ -2317,14 +2324,14 @@ void addResidueInfo(RDKit::ROMol& mol)
         auto fragment =
             ExtractMolFragment(atomistic_mol, monomer.atom_indices, false);
 
-        auto helm_symbol = findHelmSymbol(atomistic_mol, monomer);
+        auto monomer_id = findHelmSymbol(atomistic_mol, monomer);
 
         for (auto atom_idx : monomer.atom_indices) {
             auto* atom = mol.getAtomWithIdx(atom_idx);
-            atom->setProp(HELM_SYMBOL, helm_symbol ? *helm_symbol : "");
+            atom->setProp(HELM_SYMBOL, monomer_id ? monomer_id->symbol : "");
         }
 
-        if (!helm_symbol) {
+        if (!monomer_id) {
             assignBackboneAtomNames(mol, monomer, *fragment);
             auto* atom = atomistic_mol.getAtomWithIdx(monomer.atom_indices[0]);
             PRINT("monomer not recognized: {}\n",
@@ -2332,8 +2339,9 @@ void addResidueInfo(RDKit::ROMol& mol)
             continue;
         }
 
-        PRINT("monomer recognized: {}\n", *helm_symbol);
-        auto info = db.getMonomerInfo(*helm_symbol, ChainType::PEPTIDE);
+        PRINT("monomer recognized: {}\n", monomer_id->symbol);
+        auto info =
+            db.getMonomerInfo(monomer_id->symbol, monomer_id->chain_type);
 
         // Set the residue name if found. Otherwise we'll either preserve
         // what was in the input or the UNK set by addResidueInfoToAtom().
