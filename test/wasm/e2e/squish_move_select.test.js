@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { exportText, requireRect } from '../wrappers/sketcher_wasm.js';
-import { Sketcher } from '../wrappers/sketcher.js';
+import { getExportedSmiles, requireRect } from './e2e_helpers.js';
+import { Sketcher } from './squish_sketcher.js';
 
 const SOURCE_STRUCTURE = 'NC(N)=NC(=O)CC1=C(Cl)C=CC=C1Cl';
 
@@ -25,7 +25,7 @@ test.describe('ported tst_move_mode and tst_select_mode_active_selection', () =>
     await sk.click_tool('move_rotate');
     await sk.mouse_drag(0, 0, 70, 55);
 
-    await expect.poll(() => exportText(page)).not.toBe('');
+    await expect.poll(() => getExportedSmiles(page)).not.toBe('');
     await page.mouse.move(0, 0);
     await expect(page.locator('#screen canvas')).toHaveScreenshot('move-selected-structure.png');
   });

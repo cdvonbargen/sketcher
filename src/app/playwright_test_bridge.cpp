@@ -11,15 +11,14 @@
  *
  * Popup windows (menus, and Qt::Popup widgets) are painted into their own
  * canvas element, but that element is positioned over the page, so a rect
- * mapped through global coordinates is still a clickable page coordinate.
- * sketcher_activate() remains for controls that cannot be resolved to a rect at
- * all, such as an action on a menu that has not been opened.
+ * mapped through global coordinates is still a clickable page coordinate. That
+ * means every control a test needs can be reached with a real mouse event, and
+ * the bridge never has to activate anything programmatically.
  *
- * Everything here is self-contained: the functions are registered with
- * JavaScript by the EMSCRIPTEN_BINDINGS block at the bottom, so no other
- * translation unit refers to them. Production UI code neither calls nor depends
- * on this interface. The bound names are underscore-prefixed to mark them as
- * test-only.
+ * Everything here is self-contained: the function is registered with JavaScript
+ * by the EMSCRIPTEN_BINDINGS block at the bottom, so no other translation unit
+ * refers to it. Production UI code neither calls nor depends on this interface.
+ * The bound name is underscore-prefixed to mark it as test-only.
  *
  * Copyright Schrodinger LLC, All Rights Reserved.
  --------------------------------------------------------------------------- */
@@ -32,7 +31,6 @@
 #include <string>
 #include <utility>
 
-#include <QAbstractButton>
 #include <QAction>
 #include <QGraphicsItem>
 #include <QGraphicsScene>
@@ -255,36 +253,13 @@ std::string item_rect(SketcherWidget& sketcher, const bool is_atom,
         viewport_rect.size(), item->isEnabled());
 }
 
-/**
- * Trigger an action whose objectName or display text matches the given name,
- * searching every menu owned by the sketcher. Returns false if nothing matches,
- * and throws if a match is found but is disabled.
- */
-bool try_activate_action(SketcherWidget& sketcher, const QString& name)
-{
-    const QString wanted = without_mnemonic(name);
-    for (auto* action : sketcher.findChildren<QAction*>()) {
-        if (action->objectName() != name &&
-            without_mnemonic(action->text()) != wanted) {
-            continue;
-        }
-        if (!action->isEnabled()) {
-            throw std::runtime_error("playwright test bridge: action '" +
-                                     name.toStdString() + "' is disabled");
-        }
-        action->trigger();
-        return true;
-    }
-    return false;
-}
-
 } // namespace
 
-// The two functions below deliberately have external linkage even though
-// nothing else refers to them: the EMSCRIPTEN_BINDINGS block is compiled out on
-// desktop builds, and file-local functions would then trip -Wunused-function
-// under -Werror. Compiling them everywhere means the non-WASM CI jobs still
-// catch errors in this file.
+// The function below deliberately has external linkage even though nothing
+// else refers to it: the EMSCRIPTEN_BINDINGS block is compiled out on desktop
+// builds, and a file-local function would then trip -Wunused-function under
+// -Werror. Compiling it everywhere means the non-WASM CI jobs still catch
+// errors here.
 
 /**
  * Resolve an object selector to its position and size on the canvas, as
@@ -338,42 +313,6 @@ std::string sketcher_get_rect(const std::string& selector)
         "' (expected 'widget', 'action', 'atom', or 'bond')");
 }
 
-/**
- * Activate a named control: clicks a QAbstractButton, or triggers a QAction if
- * no button matches. Actions are matched on objectName first and then on
- * display text, since most menu actions are created without an objectName;
- * mnemonic ampersands are ignored when comparing text.
- *
- * This exists for controls inside Qt::Popup windows — popup menus and popup
- * widgets each get their own WASM canvas, whose event listeners Playwright
- * cannot target, so no coordinate from sketcher_get_rect() can reach them.
- * Everything in the main canvas should be clicked with real mouse events
- * instead, so that Qt's own hit-testing runs.
- *
- * Throws std::runtime_error if nothing matches, or if the match is disabled.
- * Programmatic activation skips the enabled check that a real mouse event goes
- * through, so refusing here keeps a test from passing against a control the
- * user could not have activated.
- */
-void sketcher_activate(const std::string& name_or_text)
-{
-    auto& sketcher = get_sketcher_instance();
-    const QString name = QString::fromStdString(name_or_text);
-    if (auto* button = sketcher.findChild<QAbstractButton*>(name)) {
-        if (!button->isEnabled()) {
-            throw std::runtime_error("playwright test bridge: button '" +
-                                     name_or_text + "' is disabled");
-        }
-        button->click();
-        return;
-    }
-    if (!try_activate_action(sketcher, name)) {
-        throw std::runtime_error(
-            "playwright test bridge: no button or action found matching '" +
-            name_or_text + "'");
-    }
-}
-
 #ifdef __EMSCRIPTEN__
 // A second bindings block alongside the one in main.cpp; embind allows any
 // number of them as long as each has a distinct name. This object file is
@@ -382,6 +321,5 @@ void sketcher_activate(const std::string& name_or_text)
 EMSCRIPTEN_BINDINGS(sketcher_playwright_test_bridge)
 {
     emscripten::function("_sketcher_get_rect", &sketcher_get_rect);
-    emscripten::function("_sketcher_activate", &sketcher_activate);
 }
 #endif

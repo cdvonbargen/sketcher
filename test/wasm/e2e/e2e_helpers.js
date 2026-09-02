@@ -41,10 +41,11 @@ export async function getCanvasCenter(page) {
  * and keyboard events.
  *
  * @param {import('@playwright/test').Page} page
- * @param {string} selector - "widget:<objectName>", "atom:<index>", or
- *   "bond:<index>"; indices are 0-based indices into the molecule
+ * @param {string} selector - "widget:<objectName>", "action:<objectName or
+ *   text>", "atom:<index>", or "bond:<index>"; indices are 0-based indices into
+ *   the molecule
  */
-export async function getRect(page, selector) {
+async function getRect(page, selector) {
   const rect = await page.evaluate((s) => {
     try {
       return JSON.parse(Module._sketcher_get_rect(s));
@@ -82,17 +83,40 @@ export async function getDrawingAreaCenter(page) {
 }
 
 /**
+ * Replace the current structure, bypassing the import UI.
+ *
+ * This is fixture setup, not an assertion of the Import flow; a test that
+ * covers importing should drive the dialog instead.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} text - a structure in any format the sketcher auto-detects
+ */
+export async function loadStructure(page, text) {
+  await page.evaluate((value) => Module.sketcher_import_text(value), text);
+}
+
+/**
+ * Return the current molecule in the named export format.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} format - a key of Module.Format, e.g. "MDL_MOLV3000"
+ */
+async function getExportedText(page, format) {
+  return page.evaluate((name) => Module.sketcher_export_text(Module.Format[name]), format);
+}
+
+/**
  * Return the current molecule as a SMILES string.
  */
 export async function getExportedSmiles(page) {
-  return page.evaluate(() => Module.sketcher_export_text(Module.Format.SMILES));
+  return getExportedText(page, 'SMILES');
 }
 
 /**
  * Return the current molecule as a HELM string.
  */
 export async function getExportedHelm(page) {
-  return page.evaluate(() => Module.sketcher_export_text(Module.Format.HELM));
+  return getExportedText(page, 'HELM');
 }
 
 /**
@@ -111,6 +135,80 @@ export async function isSketcherEmpty(page) {
 }
 
 /**
+ * Return the system clipboard's text/plain content.
+ *
+ * On WASM the sketcher bypasses QClipboard and talks to navigator.clipboard
+ * directly, so the page can read and write what Copy and Paste see. The
+ * clipboard permissions this needs are granted in playwright.config.js.
+ */
+export async function getClipboardText(page) {
+  return page.evaluate(() => navigator.clipboard.readText());
+}
+
+/**
+ * Put text on the system clipboard as text/plain.
+ */
+export async function setClipboardText(page, text) {
+  await page.evaluate((value) => navigator.clipboard.writeText(value), text);
+}
+
+/**
+ * Show a test-only cursor marker at a page coordinate.
+ *
+ * Playwright's trace viewer can't show where a click landed inside a canvas,
+ * so this draws the pointer position when PLAYWRIGHT_SHOW_MOUSE=1. It is off
+ * by default and is only an aid for writing and debugging tests.
+ */
+async function showMouseMarker(page, x, y) {
+  if (process.env.PLAYWRIGHT_SHOW_MOUSE !== '1') {
+    return;
+  }
+  await page.evaluate(
+    ({ left, top }) => {
+      let marker = document.getElementById('playwright-mouse-marker');
+      if (!marker) {
+        marker = document.createElement('div');
+        marker.id = 'playwright-mouse-marker';
+        Object.assign(marker.style, {
+          background: 'rgba(255, 45, 45, 0.28)',
+          border: '2px solid #ff2d2d',
+          borderRadius: '50%',
+          boxSizing: 'border-box',
+          height: '18px',
+          left: '0',
+          pointerEvents: 'none',
+          position: 'fixed',
+          top: '0',
+          transform: 'translate(-50%, -50%)',
+          width: '18px',
+          zIndex: '2147483647',
+        });
+        document.body.append(marker);
+      }
+      marker.style.display = 'block';
+      marker.style.left = `${left}px`;
+      marker.style.top = `${top}px`;
+    },
+    { left: x, top: y },
+  );
+}
+
+/**
+ * Hide the optional cursor marker, so that it stays out of a screenshot.
+ */
+export async function hideMouseMarker(page) {
+  if (process.env.PLAYWRIGHT_SHOW_MOUSE !== '1') {
+    return;
+  }
+  await page.evaluate(() => {
+    const marker = document.getElementById('playwright-mouse-marker');
+    if (marker) {
+      marker.style.display = 'none';
+    }
+  });
+}
+
+/**
  * Press and release a mouse button at a page coordinate, optionally with
  * keyboard modifiers held down.
  *
@@ -126,6 +224,7 @@ export async function isSketcherEmpty(page) {
  * @param {string[]} [options.modifiers] - e.g. ['Shift']
  */
 export async function mouseClick(page, x, y, { button = 'left', modifiers = [] } = {}) {
+  await showMouseMarker(page, x, y);
   for (const modifier of modifiers) {
     await page.keyboard.down(modifier);
   }
@@ -158,6 +257,7 @@ export async function mouseDrag(
   end,
   { button = 'left', modifiers = [], steps = 12 } = {},
 ) {
+  await showMouseMarker(page, start.x, start.y);
   for (const modifier of modifiers) {
     await page.keyboard.down(modifier);
   }
@@ -177,6 +277,7 @@ export async function mouseDrag(
       await page.keyboard.up(modifier);
     }
   }
+  await showMouseMarker(page, end.x, end.y);
 }
 
 /**
@@ -192,7 +293,7 @@ export async function mouseDrag(
  * @param {import('@playwright/test').Page} page
  * @param {string} selector - see getRect
  */
-export async function waitForClickable(page, selector) {
+async function waitForClickable(page, selector) {
   let rect;
   await expect
     .poll(
@@ -217,31 +318,23 @@ export async function waitForClickable(page, selector) {
  * @param {string} selector - see getRect
  * @param {object} [options] - see mouseClick
  */
-export async function click(page, selector, options) {
+async function click(page, selector, options) {
   const rect = await waitForClickable(page, selector);
   await mouseClick(page, rect.x + rect.width / 2, rect.y + rect.height / 2, options);
 }
 
 /**
- * Move the pointer over whatever a selector resolves to. Used to open a
- * cascading submenu the way a user does.
+ * Click a widget by its Qt objectName (e.g. "c_btn").
+ *
+ * This works for a widget inside a Qt::Popup as well as one in the main window,
+ * because the bridge maps rects through global coordinates.
  *
  * @param {import('@playwright/test').Page} page
- * @param {string} selector - see getRect
+ * @param {string} name - Qt objectName of the widget
+ * @param {object} [options] - see mouseClick
  */
-export async function hover(page, selector) {
-  const rect = await waitForClickable(page, selector);
-  await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2, { steps: 4 });
-}
-
-/**
- * Click a toolbar button by its Qt objectName (e.g. "c_btn").
- *
- * @param {import('@playwright/test').Page} page
- * @param {string} name - Qt objectName of the button
- */
-export async function clickWidget(page, name) {
-  await click(page, `widget:${name}`);
+export async function clickWidget(page, name, options) {
+  await click(page, `widget:${name}`, options);
 }
 
 /**
@@ -251,7 +344,7 @@ export async function clickWidget(page, name) {
  * @param {'atom'|'bond'} kind - monomers are addressed as 'atom' and monomer
  *   connectors as 'bond'
  * @param {number} index - 0-based index into the molecule's atoms or bonds
- * @param {object} [options] - forwarded to page.mouse.click (e.g. {button: 'right'})
+ * @param {object} [options] - see mouseClick
  */
 export async function clickItem(page, kind, index, options) {
   await click(page, `${kind}:${index}`, options);
@@ -278,30 +371,42 @@ export async function clickAction(page, nameOrText) {
  * @param {string} nameOrText - objectName, or the row's visible text
  */
 export async function hoverAction(page, nameOrText) {
-  await hover(page, `action:${nameOrText}`);
+  const rect = await waitForClickable(page, `action:${nameOrText}`);
+  await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2, { steps: 4 });
 }
 
 /**
- * Programmatically activate a control by its Qt objectName, or a menu action by
- * its objectName or visible text.
- *
- * Prefer click() with a selector wherever possible, so that Qt's own hit-testing
- * runs. This is the fallback for controls that can't be resolved to a rect at
- * all — most usefully an action on a menu that hasn't been opened, since
- * actions only have geometry while their menu is laid out.
+ * Click a visible text control and replace its value through keyboard input.
  *
  * @param {import('@playwright/test').Page} page
- * @param {string} nameOrText - Qt objectName, or the action's visible text
- * @throws if nothing matches, or if the match is disabled
+ * @param {string} name - Qt objectName of the text control
+ * @param {string} text
  */
-export async function activate(page, nameOrText) {
-  await page.evaluate((n) => {
-    try {
-      Module._sketcher_activate(n);
-    } catch (e) {
-      // A C++ exception reaches JS as an opaque emscripten value, so decode it
-      // to keep the reason in the test failure
-      throw new Error(Module.getExceptionMessage(e).join(': '));
-    }
-  }, nameOrText);
+export async function setWidgetText(page, name, text) {
+  await clickWidget(page, name);
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type(String(text), { delay: 10 });
+}
+
+/**
+ * Place a single atom of the given element in the middle of the drawing area,
+ * selecting the element with its keyboard shortcut.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} element - an element symbol with a shortcut, e.g. "N"
+ */
+export async function drawElement(page, element) {
+  const center = await getDrawingAreaCenter(page);
+  await focusCanvas(page);
+  await page.keyboard.press(element);
+  await mouseClick(page, center.x, center.y);
+}
+
+/**
+ * Draw one bond with the active bond tool, starting from the middle of the
+ * drawing area.
+ */
+export async function drawBond(page) {
+  const center = await getDrawingAreaCenter(page);
+  await mouseDrag(page, center, { x: center.x + 100, y: center.y });
 }
