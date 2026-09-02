@@ -9,9 +9,11 @@
  * can do with coordinates plus Playwright belongs in the JavaScript helpers,
  * not here.
  *
- * sketcher_activate() is the one deliberate exception. A Qt::Popup window gets
- * its own canvas element whose event listeners Playwright cannot target, so for
- * controls inside a popup there is no coordinate that can be clicked at all.
+ * Popup windows (menus, and Qt::Popup widgets) are painted into their own
+ * canvas element, but that element is positioned over the page, so a rect
+ * mapped through global coordinates is still a clickable page coordinate.
+ * sketcher_activate() remains for controls that cannot be resolved to a rect at
+ * all, such as an action on a menu that has not been opened.
  *
  * Everything here is self-contained: the functions are registered with
  * JavaScript by the EMSCRIPTEN_BINDINGS block at the bottom, so no other
@@ -37,6 +39,7 @@
 #include <QGraphicsView>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMenu>
 #include <QPoint>
 #include <QRect>
 #include <QSize>
@@ -91,6 +94,16 @@ std::pair<std::string, std::string> split_selector(const std::string& selector)
 }
 
 /**
+ * QAction text may contain an ampersand marking its mnemonic (e.g. "Modify
+ * &All"), but tests refer to actions by the name the user sees.
+ */
+QString without_mnemonic(QString text)
+{
+    text.remove('&');
+    return text.simplified();
+}
+
+/**
  * Find a visible child widget by objectName. Several widgets may share a name,
  * so this returns the first visible one, or nullptr if none is visible.
  */
@@ -102,6 +115,22 @@ QWidget* find_visible_widget(SketcherWidget& sketcher, const QString& name)
         }
     }
     return nullptr;
+}
+
+/**
+ * Map a point from some widget's coordinates into the sketcher's.
+ *
+ * This deliberately goes through global coordinates rather than using
+ * QWidget::mapTo(). A Qt::Popup (or a dialog) is a separate top-level window,
+ * and mapTo() only walks the widget hierarchy — for a window it accumulates
+ * screen coordinates partway through and returns nonsense. Going via global
+ * coordinates is correct for both cases and matches what Qt itself does for
+ * independent top-level widgets.
+ */
+QPoint map_to_sketcher(const QWidget& widget, const SketcherWidget& sketcher,
+                       const QPoint& point)
+{
+    return sketcher.mapFromGlobal(widget.mapToGlobal(point));
 }
 
 QGraphicsView& require_view(SketcherWidget& sketcher)
@@ -157,8 +186,46 @@ std::string widget_rect(SketcherWidget& sketcher, const std::string& name)
     if (widget == nullptr) {
         return "{}";
     }
-    return rect_to_json(widget->mapTo(&sketcher, QPoint(0, 0)), widget->size(),
-                        widget->isEnabled());
+    return rect_to_json(map_to_sketcher(*widget, sketcher, QPoint(0, 0)),
+                        widget->size(), widget->isEnabled());
+}
+
+/**
+ * Resolve an "action:<objectName or text>" selector to the action's row in
+ * whichever menu is currently open, or "{}" if no visible menu has it.
+ *
+ * Only visible menus are searched, and only on demand: a QMenu has no geometry
+ * until it is laid out, and inspecting one during its own show sequence aborts
+ * the Qt/WASM runtime. Once the popup is up, actionGeometry() is safe to read
+ * and gives a real click target. Submenus are found the same way, since an open
+ * submenu is just another visible QMenu.
+ *
+ * Actions are matched on objectName first and then on display text, since most
+ * menu actions are created without an objectName.
+ */
+std::string action_rect(SketcherWidget& sketcher, const std::string& name)
+{
+    const QString query = QString::fromStdString(name);
+    const QString wanted = without_mnemonic(query);
+    for (auto* menu : sketcher.findChildren<QMenu*>()) {
+        if (!menu->isVisible()) {
+            continue;
+        }
+        for (auto* action : menu->actions()) {
+            if (action->objectName() != query &&
+                without_mnemonic(action->text()) != wanted) {
+                continue;
+            }
+            const QRect geometry = menu->actionGeometry(action);
+            if (geometry.isEmpty()) {
+                continue;
+            }
+            return rect_to_json(
+                map_to_sketcher(*menu, sketcher, geometry.topLeft()),
+                geometry.size(), action->isEnabled());
+        }
+    }
+    return "{}";
 }
 
 /**
@@ -184,18 +251,8 @@ std::string item_rect(SketcherWidget& sketcher, const bool is_atom,
     const QRect viewport_rect =
         view.mapFromScene(item->sceneBoundingRect()).boundingRect();
     return rect_to_json(
-        view.viewport()->mapTo(&sketcher, viewport_rect.topLeft()),
+        map_to_sketcher(*view.viewport(), sketcher, viewport_rect.topLeft()),
         viewport_rect.size(), item->isEnabled());
-}
-
-/**
- * QAction text may contain an ampersand marking its mnemonic (e.g. "Modify
- * &All"), but tests refer to actions by the name the user sees.
- */
-QString without_mnemonic(QString text)
-{
-    text.remove('&');
-    return text.simplified();
 }
 
 /**
@@ -238,6 +295,8 @@ bool try_activate_action(SketcherWidget& sketcher, const QString& name)
  * Supported selectors:
  *
  *   "widget:<objectName>"  a QWidget, by its Qt objectName
+ *   "action:<name>"        a row of a currently-open menu, by objectName or
+ *                          visible text
  *   "atom:<index>"         an atom of the current molecule, by model index
  *   "bond:<index>"         a bond of the current molecule, by model index
  *
@@ -268,12 +327,15 @@ std::string sketcher_get_rect(const std::string& selector)
     if (kind == "widget") {
         return widget_rect(sketcher, value);
     }
+    if (kind == "action") {
+        return action_rect(sketcher, value);
+    }
     if (kind == "atom" || kind == "bond") {
         return item_rect(sketcher, kind == "atom", value);
     }
     throw std::runtime_error(
         "playwright test bridge: unrecognized selector kind '" + kind +
-        "' (expected 'widget', 'atom', or 'bond')");
+        "' (expected 'widget', 'action', 'atom', or 'bond')");
 }
 
 /**

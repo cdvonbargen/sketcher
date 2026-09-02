@@ -62,7 +62,10 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: wasm-snapshots-${{ github.run_id }}
+          # The recursive pattern picks up snapshot directories alongside tests
+          # in subdirectories, such as e2e/from_squish/test/.
           path: |
             test/wasm/__snapshots__/
             test/wasm/e2e/__snapshots__/
+            test/wasm/**/__snapshots__/
           if-no-files-found: error

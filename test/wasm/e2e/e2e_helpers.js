@@ -111,21 +111,88 @@ export async function isSketcherEmpty(page) {
 }
 
 /**
- * Click whatever a selector resolves to, with a real mouse event so that Qt's
- * own hit-testing runs.
+ * Press and release a mouse button at a page coordinate, optionally with
+ * keyboard modifiers held down.
  *
- * Waits for the target to become visible and enabled first, since Qt updates
- * both in response to model changes that may not have landed yet. Fails if it
- * never does: a real user couldn't have clicked a disabled control, and a test
- * that clicks one and then asserts nothing happened would pass whether or not
- * the control was actually unavailable. To assert unavailability, poll
- * `(await requireRect(page, selector)).enabled` instead.
+ * Playwright's page.mouse.click() takes no modifiers, and Qt wants to see the
+ * pointer arrive before the press, so this moves first and holds the modifiers
+ * around the whole gesture.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {number} x
+ * @param {number} y
+ * @param {object} [options]
+ * @param {'left'|'right'|'middle'} [options.button]
+ * @param {string[]} [options.modifiers] - e.g. ['Shift']
+ */
+export async function mouseClick(page, x, y, { button = 'left', modifiers = [] } = {}) {
+  for (const modifier of modifiers) {
+    await page.keyboard.down(modifier);
+  }
+  try {
+    await page.mouse.move(x, y, { steps: 4 });
+    await page.mouse.down({ button });
+    await page.mouse.up({ button });
+  } finally {
+    for (const modifier of [...modifiers].reverse()) {
+      await page.keyboard.up(modifier);
+    }
+  }
+}
+
+/**
+ * Drag from one page coordinate to another with intermediate moves, so that Qt
+ * sees a real drag rather than a teleport.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {{x: number, y: number}} start
+ * @param {{x: number, y: number}} end
+ * @param {object} [options]
+ * @param {'left'|'right'|'middle'} [options.button]
+ * @param {string[]} [options.modifiers]
+ * @param {number} [options.steps]
+ */
+export async function mouseDrag(
+  page,
+  start,
+  end,
+  { button = 'left', modifiers = [], steps = 12 } = {},
+) {
+  for (const modifier of modifiers) {
+    await page.keyboard.down(modifier);
+  }
+  try {
+    await page.mouse.move(start.x, start.y, { steps: 4 });
+    await page.mouse.down({ button });
+    for (let step = 1; step <= steps; step += 1) {
+      const progress = step / steps;
+      await page.mouse.move(
+        start.x + (end.x - start.x) * progress,
+        start.y + (end.y - start.y) * progress,
+      );
+    }
+    await page.mouse.up({ button });
+  } finally {
+    for (const modifier of [...modifiers].reverse()) {
+      await page.keyboard.up(modifier);
+    }
+  }
+}
+
+/**
+ * Wait for a selector to resolve to a visible, enabled rect and return it.
+ *
+ * Qt updates visibility and enabled state in response to model changes that may
+ * not have landed yet, and a menu popup is laid out an event-loop turn after
+ * the click that opens it. Failing on disabled is deliberate: a real user
+ * couldn't have clicked it, and a test that clicks a disabled control then
+ * asserts nothing happened would pass either way. To assert unavailability,
+ * poll `(await requireRect(page, selector)).enabled` instead.
  *
  * @param {import('@playwright/test').Page} page
  * @param {string} selector - see getRect
- * @param {object} [options] - forwarded to page.mouse.click (e.g. {button: 'right'})
  */
-export async function click(page, selector, options) {
+export async function waitForClickable(page, selector) {
   let rect;
   await expect
     .poll(
@@ -139,7 +206,32 @@ export async function click(page, selector, options) {
       { timeout: 5000, message: `"${selector}"` },
     )
     .toBe('clickable');
-  await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2, options);
+  return rect;
+}
+
+/**
+ * Click whatever a selector resolves to, with a real mouse event so that Qt's
+ * own hit-testing runs.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} selector - see getRect
+ * @param {object} [options] - see mouseClick
+ */
+export async function click(page, selector, options) {
+  const rect = await waitForClickable(page, selector);
+  await mouseClick(page, rect.x + rect.width / 2, rect.y + rect.height / 2, options);
+}
+
+/**
+ * Move the pointer over whatever a selector resolves to. Used to open a
+ * cascading submenu the way a user does.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} selector - see getRect
+ */
+export async function hover(page, selector) {
+  const rect = await waitForClickable(page, selector);
+  await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2, { steps: 4 });
 }
 
 /**
@@ -166,13 +258,37 @@ export async function clickItem(page, kind, index, options) {
 }
 
 /**
+ * Click a row of a currently-open menu by its objectName or visible text.
+ *
+ * The menu must already be open — an action has no geometry until its menu is
+ * laid out. click() polls, so this tolerates the event-loop turn Qt takes to
+ * show the popup after the button that opens it is clicked.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} nameOrText - objectName, or the row's visible text
+ */
+export async function clickAction(page, nameOrText) {
+  await click(page, `action:${nameOrText}`);
+}
+
+/**
+ * Hover a row of a currently-open menu to open its submenu.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} nameOrText - objectName, or the row's visible text
+ */
+export async function hoverAction(page, nameOrText) {
+  await hover(page, `action:${nameOrText}`);
+}
+
+/**
  * Programmatically activate a control by its Qt objectName, or a menu action by
  * its objectName or visible text.
  *
- * This is for controls inside Qt::Popup windows only — popup menus and popup
- * widgets each get their own canvas in WASM, whose event listeners Playwright
- * can't target, so no rect from getRect can reach them. Use click() for
- * anything in the main canvas so that real mouse events are exercised.
+ * Prefer click() with a selector wherever possible, so that Qt's own hit-testing
+ * runs. This is the fallback for controls that can't be resolved to a rect at
+ * all — most usefully an action on a menu that hasn't been opened, since
+ * actions only have geometry while their menu is laid out.
  *
  * @param {import('@playwright/test').Page} page
  * @param {string} nameOrText - Qt objectName, or the action's visible text
