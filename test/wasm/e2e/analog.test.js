@@ -5,7 +5,7 @@ import {
   getExportedHelm,
   selectAll,
   clickWidget,
-  clickPopupButton,
+  activate,
 } from './e2e_helpers.js';
 
 test.beforeEach(async ({ page }) => {
@@ -36,8 +36,8 @@ test.describe('Amino Acid Analog Tests', () => {
     await clickWidget(page, 'ala_btn');
 
     // Select the dA analog via the C++ API (popup buttons can't be
-    // targeted by Playwright in WASM — see clickPopupButton helper).
-    await clickPopupButton(page, 'analog_dA_btn');
+    // targeted by Playwright in WASM — see the activate helper).
+    await activate(page, 'analog_dA_btn');
 
     // Place the analog on canvas
     const center = await getDrawingAreaCenter(page);

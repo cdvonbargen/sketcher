@@ -4,6 +4,8 @@ import {
   focusCanvas,
   getCanvasCenter,
   getExportedSmiles,
+  clickWidget,
+  clickItem,
 } from './e2e_helpers.js';
 
 test.beforeEach(async ({ page }) => {
@@ -46,6 +48,21 @@ test.describe('Drawing', () => {
     await page.mouse.down();
     await page.mouse.move(center.x + dragDistance, center.y, { steps: 10 });
     await page.mouse.up();
+
+    await expect.poll(() => getExportedSmiles(page), { timeout: 5000 }).toBe('CC');
+  });
+
+  test('erase a specific atom addressed by index', async ({ page }) => {
+    await page.evaluate(() => {
+      Module.sketcher_import_text('CCO');
+    });
+    await clickWidget(page, 'fit_btn');
+    await expect.poll(() => getExportedSmiles(page), { timeout: 5000 }).toBe('CCO');
+
+    // Target the oxygen by its index in the molecule rather than by guessing
+    // at a canvas position
+    await clickWidget(page, 'erase_btn');
+    await clickItem(page, 'atom', 2);
 
     await expect.poll(() => getExportedSmiles(page), { timeout: 5000 }).toBe('CC');
   });

@@ -1,3 +1,5 @@
+import { expect } from '@playwright/test';
+
 /**
  * Navigate to the sketcher page and wait for the WASM module to be fully
  * loaded and the canvas to be visible.
@@ -30,19 +32,42 @@ export async function getCanvasCenter(page) {
 }
 
 /**
- * Return the {x, y, width, height} rect of any child widget by its Qt
- * objectName. Uses a single generic C++ function so no new WASM bindings
- * are needed when new widgets are introduced.
+ * Resolve an object selector to {x, y, width, height, enabled} in page
+ * coordinates, or null if nothing visible matches.
+ *
+ * This is the only way tests can locate anything inside the sketcher: Qt paints
+ * the whole application into one canvas, so there are no DOM elements to query.
+ * Once you have a rect, drive the application with ordinary Playwright mouse
+ * and keyboard events.
+ *
  * @param {import('@playwright/test').Page} page
- * @param {string} objectName - Qt objectName of the widget
+ * @param {string} selector - "widget:<objectName>", "atom:<index>", or
+ *   "bond:<index>"; indices are 0-based indices into the molecule
  */
-export async function getWidgetRect(page, objectName) {
-  const rect = await page.evaluate(
-    (name) => JSON.parse(Module._sketcher_get_widget_rect(name)),
-    objectName,
-  );
-  if (!rect || rect.width === undefined) {
-    throw new Error(`Widget "${objectName}" not found`);
+export async function getRect(page, selector) {
+  const rect = await page.evaluate((s) => {
+    try {
+      return JSON.parse(Module._sketcher_get_rect(s));
+    } catch (e) {
+      // A C++ exception reaches JS as an opaque emscripten value, so decode it
+      // to keep the reason in the test failure
+      throw new Error(Module.getExceptionMessage(e).join(': '));
+    }
+  }, selector);
+  return rect && rect.width !== undefined ? rect : null;
+}
+
+/**
+ * Return {x, y, width, height, enabled} for a selector, failing if nothing
+ * visible matches.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} selector - see getRect
+ */
+export async function requireRect(page, selector) {
+  const rect = await getRect(page, selector);
+  if (rect === null) {
+    throw new Error(`Nothing visible matches "${selector}"`);
   }
   return rect;
 }
@@ -52,7 +77,7 @@ export async function getWidgetRect(page, objectName) {
  * @param {import('@playwright/test').Page} page
  */
 export async function getDrawingAreaCenter(page) {
-  const rect = await getWidgetRect(page, 'view');
+  const rect = await requireRect(page, 'widget:view');
   return { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) };
 }
 
@@ -86,26 +111,80 @@ export async function isSketcherEmpty(page) {
 }
 
 /**
+ * Click whatever a selector resolves to, with a real mouse event so that Qt's
+ * own hit-testing runs.
+ *
+ * Waits for the target to become visible and enabled first, since Qt updates
+ * both in response to model changes that may not have landed yet. Fails if it
+ * never does: a real user couldn't have clicked a disabled control, and a test
+ * that clicks one and then asserts nothing happened would pass whether or not
+ * the control was actually unavailable. To assert unavailability, poll
+ * `(await requireRect(page, selector)).enabled` instead.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} selector - see getRect
+ * @param {object} [options] - forwarded to page.mouse.click (e.g. {button: 'right'})
+ */
+export async function click(page, selector, options) {
+  let rect;
+  await expect
+    .poll(
+      async () => {
+        rect = await getRect(page, selector);
+        if (rect === null) {
+          return 'not visible';
+        }
+        return rect.enabled ? 'clickable' : 'disabled';
+      },
+      { timeout: 5000, message: `"${selector}"` },
+    )
+    .toBe('clickable');
+  await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2, options);
+}
+
+/**
  * Click a toolbar button by its Qt objectName (e.g. "c_btn").
- * Uses the generic getWidgetRect to find the button's position.
  *
  * @param {import('@playwright/test').Page} page
  * @param {string} name - Qt objectName of the button
  */
 export async function clickWidget(page, name) {
-  const rect = await getWidgetRect(page, name);
-  await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  await click(page, `widget:${name}`);
 }
 
 /**
- * Programmatically click a popup button by its Qt objectName.
- * Qt::Popup windows in WASM create a separate canvas whose event listeners
- * can't be targeted by Playwright, so we call into C++ directly.
+ * Click an atom or bond by its index in the molecule.
  *
  * @param {import('@playwright/test').Page} page
- * @param {string} name - Qt objectName of the popup button
- * @throws if no button with the given name is found
+ * @param {'atom'|'bond'} kind - monomers are addressed as 'atom'
+ * @param {number} index - 0-based index into the molecule's atoms or bonds
+ * @param {object} [options] - forwarded to page.mouse.click (e.g. {button: 'right'})
  */
-export async function clickPopupButton(page, name) {
-  await page.evaluate((n) => Module._sketcher_click_button(n), name);
+export async function clickItem(page, kind, index, options) {
+  await click(page, `${kind}:${index}`, options);
+}
+
+/**
+ * Programmatically activate a control by its Qt objectName, or a menu action by
+ * its objectName or visible text.
+ *
+ * This is for controls inside Qt::Popup windows only — popup menus and popup
+ * widgets each get their own canvas in WASM, whose event listeners Playwright
+ * can't target, so no rect from getRect can reach them. Use click() for
+ * anything in the main canvas so that real mouse events are exercised.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} nameOrText - Qt objectName, or the action's visible text
+ * @throws if nothing matches, or if the match is disabled
+ */
+export async function activate(page, nameOrText) {
+  await page.evaluate((n) => {
+    try {
+      Module._sketcher_activate(n);
+    } catch (e) {
+      // A C++ exception reaches JS as an opaque emscripten value, so decode it
+      // to keep the reason in the test failure
+      throw new Error(Module.getExceptionMessage(e).join(': '));
+    }
+  }, nameOrText);
 }
