@@ -156,7 +156,8 @@ export async function clickWidget(page, name) {
  * Click an atom or bond by its index in the molecule.
  *
  * @param {import('@playwright/test').Page} page
- * @param {'atom'|'bond'} kind - monomers are addressed as 'atom'
+ * @param {'atom'|'bond'} kind - monomers are addressed as 'atom' and monomer
+ *   connectors as 'bond'
  * @param {number} index - 0-based index into the molecule's atoms or bonds
  * @param {object} [options] - forwarded to page.mouse.click (e.g. {button: 'right'})
  */

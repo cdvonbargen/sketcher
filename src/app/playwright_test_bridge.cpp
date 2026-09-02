@@ -46,13 +46,13 @@
 #include <rdkit/GraphMol/Atom.h>
 #include <rdkit/GraphMol/Bond.h>
 
-#include "schrodinger/sketcher/molviewer/atom_item.h"
-#include "schrodinger/sketcher/molviewer/bond_item.h"
+#include "schrodinger/sketcher/molviewer/abstract_atom_or_monomer_item.h"
+#include "schrodinger/sketcher/molviewer/abstract_bond_or_connector_item.h"
 #include "schrodinger/sketcher/sketcher_widget.h"
 #include "sketcher_instance.h"
 
-using schrodinger::sketcher::AtomItem;
-using schrodinger::sketcher::BondItem;
+using schrodinger::sketcher::AbstractAtomOrMonomerItem;
+using schrodinger::sketcher::AbstractBondOrConnectorItem;
 using schrodinger::sketcher::SketcherWidget;
 
 namespace
@@ -117,6 +117,11 @@ QGraphicsView& require_view(SketcherWidget& sketcher)
 /**
  * Find the visible Scene item for the atom or bond at the given model index, or
  * nullptr if there isn't one.
+ *
+ * The casts are dynamic_casts to the abstract base classes rather than
+ * qgraphicsitem_casts to AtomItem/BondItem, because qgraphicsitem_cast matches
+ * type() exactly and so would skip monomers and monomer connectors: those are
+ * siblings of AtomItem and BondItem, not subclasses.
  */
 QGraphicsItem* find_visible_item(const QGraphicsView& view, const bool is_atom,
                                  const int index)
@@ -126,13 +131,13 @@ QGraphicsItem* find_visible_item(const QGraphicsView& view, const bool is_atom,
             continue;
         }
         if (is_atom) {
-            auto* atom_item = qgraphicsitem_cast<AtomItem*>(item);
+            auto* atom_item = dynamic_cast<AbstractAtomOrMonomerItem*>(item);
             if (atom_item != nullptr &&
                 static_cast<int>(atom_item->getAtom()->getIdx()) == index) {
                 return atom_item;
             }
         } else {
-            auto* bond_item = qgraphicsitem_cast<BondItem*>(item);
+            auto* bond_item = dynamic_cast<AbstractBondOrConnectorItem*>(item);
             if (bond_item != nullptr &&
                 static_cast<int>(bond_item->getBond()->getIdx()) == index) {
                 return bond_item;
@@ -236,11 +241,11 @@ bool try_activate_action(SketcherWidget& sketcher, const QString& name)
  *   "atom:<index>"         an atom of the current molecule, by model index
  *   "bond:<index>"         a bond of the current molecule, by model index
  *
- * Monomers are addressed as "atom", since they are atoms of a monomeric
- * molecule. Every atom has a non-empty bounding rect even when its label isn't
- * painted (an unlabeled carbon, say), because the rect is built from the
- * predictive highlighting path, so the returned rect is always a usable click
- * target.
+ * Monomers are addressed as "atom" and monomer connectors as "bond", since the
+ * model stores them as RDKit atoms and bonds. Every atom has a non-empty
+ * bounding rect even when its label isn't painted (an unlabeled carbon, say),
+ * because the rect is built from the predictive highlighting path, so the
+ * returned rect is always a usable click target.
  *
  * Model indices are indices into the molecule returned by
  * SketcherWidget::getRDKitMolecule(). That molecule is a plain copy of the one
