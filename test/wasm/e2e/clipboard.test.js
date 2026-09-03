@@ -8,14 +8,20 @@ import {
   loadStructure,
   setClipboardText,
   clickWidget,
+  activateAction,
 } from './e2e_helpers.js';
 
 // On WASM the sketcher bypasses QClipboard entirely: copy writes to
 // navigator.clipboard directly and paste reads from it. These tests exercise
-// that path end to end through real Ctrl+C / Ctrl+V key presses, using the
-// browser's own clipboard API to set up and inspect the payload. That is also
-// why the Playwright bridge has no C++ clipboard binding — there is nothing for
-// one to do that the page can't already do.
+// that path end to end, using the browser's own clipboard API to set up and
+// inspect the payload. That is also why the Playwright bridge has no C++
+// clipboard binding — there is nothing for one to do that the page can't
+// already do.
+//
+// Copy and cut go through real Ctrl+C / Ctrl+X presses, but paste cannot: Qt
+// swallows Ctrl+V while it waits for the browser's own paste event, which
+// Chromium will not raise for a scripted key press. Paste is driven through the
+// Paste menu action instead, which reaches the same clipboard read.
 
 test.beforeEach(async ({ page }) => {
   await waitForSketcherReady(page);
@@ -40,8 +46,7 @@ test.describe('Clipboard', () => {
     await setClipboardText(page, 'c1ccccc1');
     expect(await isSketcherEmpty(page)).toBe(true);
 
-    await focusCanvas(page);
-    await page.keyboard.press('ControlOrMeta+v');
+    await activateAction(page, 'Paste');
 
     await expect.poll(() => getExportedSmiles(page), { timeout: 5000 }).toBe('c1ccccc1');
   });
@@ -60,8 +65,7 @@ test.describe('Clipboard', () => {
     await clickWidget(page, 'clear_btn');
     await expect.poll(() => isSketcherEmpty(page), { timeout: 5000 }).toBe(true);
 
-    await focusCanvas(page);
-    await page.keyboard.press('ControlOrMeta+v');
+    await activateAction(page, 'Paste');
 
     // Copy stashes a lossless RDKit pickle alongside the text, so pasting back
     // into the sketcher reproduces the structure exactly

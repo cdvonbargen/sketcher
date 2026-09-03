@@ -9,16 +9,21 @@
  * can do with coordinates plus Playwright belongs in the JavaScript helpers,
  * not here.
  *
- * Popup windows (menus, and Qt::Popup widgets) are painted into their own
- * canvas element, but that element is positioned over the page, so a rect
- * mapped through global coordinates is still a clickable page coordinate. That
- * means every control a test needs can be reached with a real mouse event, and
- * the bridge never has to activate anything programmatically.
+ * A Qt::Popup widget is painted into its own canvas element, but that element
+ * is positioned over the page, so a rect mapped through global coordinates is
+ * still a clickable page coordinate. Such a widget is reached with a real mouse
+ * event like anything else.
  *
- * Everything here is self-contained: the function is registered with JavaScript
- * by the EMSCRIPTEN_BINDINGS block at the bottom, so no other translation unit
- * refers to it. Production UI code neither calls nor depends on this interface.
- * The bound name is underscore-prefixed to mark it as test-only.
+ * Menus are the one exception, and sketcher_activate_action() exists for them
+ * alone: Qt runs a nested event loop while a QToolButton's menu is open, which
+ * under Asyncify suspends the WebAssembly stack and stops any call into the
+ * module from completing until the menu closes. See that function for detail.
+ *
+ * Everything here is self-contained: the functions are registered with
+ * JavaScript by the EMSCRIPTEN_BINDINGS block at the bottom, so no other
+ * translation unit refers to them. Production UI code neither calls nor depends
+ * on this interface. The bound names are underscore-prefixed to mark them
+ * test-only.
  *
  * Copyright Schrodinger LLC, All Rights Reserved.
  --------------------------------------------------------------------------- */
@@ -37,7 +42,6 @@
 #include <QGraphicsView>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QMenu>
 #include <QPoint>
 #include <QRect>
 #include <QSize>
@@ -189,44 +193,6 @@ std::string widget_rect(SketcherWidget& sketcher, const std::string& name)
 }
 
 /**
- * Resolve an "action:<objectName or text>" selector to the action's row in
- * whichever menu is currently open, or "{}" if no visible menu has it.
- *
- * Only visible menus are searched, and only on demand: a QMenu has no geometry
- * until it is laid out, and inspecting one during its own show sequence aborts
- * the Qt/WASM runtime. Once the popup is up, actionGeometry() is safe to read
- * and gives a real click target. Submenus are found the same way, since an open
- * submenu is just another visible QMenu.
- *
- * Actions are matched on objectName first and then on display text, since most
- * menu actions are created without an objectName.
- */
-std::string action_rect(SketcherWidget& sketcher, const std::string& name)
-{
-    const QString query = QString::fromStdString(name);
-    const QString wanted = without_mnemonic(query);
-    for (auto* menu : sketcher.findChildren<QMenu*>()) {
-        if (!menu->isVisible()) {
-            continue;
-        }
-        for (auto* action : menu->actions()) {
-            if (action->objectName() != query &&
-                without_mnemonic(action->text()) != wanted) {
-                continue;
-            }
-            const QRect geometry = menu->actionGeometry(action);
-            if (geometry.isEmpty()) {
-                continue;
-            }
-            return rect_to_json(
-                map_to_sketcher(*menu, sketcher, geometry.topLeft()),
-                geometry.size(), action->isEnabled());
-        }
-    }
-    return "{}";
-}
-
-/**
  * Resolve an "atom:<index>" or "bond:<index>" selector, or "{}" if no visible
  * item matches. Scene items are QGraphicsItems rather than QWidgets, so they
  * can't be found by objectName; their bounding rect is mapped through the View
@@ -253,12 +219,36 @@ std::string item_rect(SketcherWidget& sketcher, const bool is_atom,
         viewport_rect.size(), item->isEnabled());
 }
 
+/**
+ * Trigger the QAction matching name_or_text, or return false if there is none.
+ *
+ * Actions are matched on objectName first and then on display text, since most
+ * menu actions are created without an objectName.
+ */
+bool try_activate_action(SketcherWidget& sketcher, const QString& name)
+{
+    const QString wanted = without_mnemonic(name);
+    for (auto* action : sketcher.findChildren<QAction*>()) {
+        if (action->objectName() != name &&
+            without_mnemonic(action->text()) != wanted) {
+            continue;
+        }
+        if (!action->isEnabled()) {
+            throw std::runtime_error("playwright test bridge: action '" +
+                                     name.toStdString() + "' is disabled");
+        }
+        action->trigger();
+        return true;
+    }
+    return false;
+}
+
 } // namespace
 
-// The function below deliberately has external linkage even though nothing
-// else refers to it: the EMSCRIPTEN_BINDINGS block is compiled out on desktop
-// builds, and a file-local function would then trip -Wunused-function under
-// -Werror. Compiling it everywhere means the non-WASM CI jobs still catch
+// The functions below deliberately have external linkage even though nothing
+// else refers to them: the EMSCRIPTEN_BINDINGS block is compiled out on desktop
+// builds, and file-local functions would then trip -Wunused-function under
+// -Werror. Compiling them everywhere means the non-WASM CI jobs still catch
 // errors here.
 
 /**
@@ -270,8 +260,6 @@ std::string item_rect(SketcherWidget& sketcher, const bool is_atom,
  * Supported selectors:
  *
  *   "widget:<objectName>"  a QWidget, by its Qt objectName
- *   "action:<name>"        a row of a currently-open menu, by objectName or
- *                          visible text
  *   "atom:<index>"         an atom of the current molecule, by model index
  *   "bond:<index>"         a bond of the current molecule, by model index
  *
@@ -302,15 +290,44 @@ std::string sketcher_get_rect(const std::string& selector)
     if (kind == "widget") {
         return widget_rect(sketcher, value);
     }
-    if (kind == "action") {
-        return action_rect(sketcher, value);
-    }
     if (kind == "atom" || kind == "bond") {
         return item_rect(sketcher, kind == "atom", value);
     }
     throw std::runtime_error(
         "playwright test bridge: unrecognized selector kind '" + kind +
-        "' (expected 'widget', 'action', 'atom', or 'bond')");
+        "' (expected 'widget', 'atom', or 'bond')");
+}
+
+/**
+ * Trigger a menu action by objectName or visible text, without opening the menu
+ * it belongs to. Mnemonic ampersands are ignored when comparing text.
+ *
+ * This exists because a menu row cannot be clicked the way every other control
+ * can. The menu belongs to a QToolButton, and Qt runs a nested event loop for
+ * as long as that menu is open. Qt/WASM is built with Asyncify, so that nested
+ * loop leaves the WebAssembly stack suspended, and no further call into the
+ * module completes until the menu closes — sketcher_get_rect() included. A test
+ * therefore cannot ask where a menu row is while the menu is showing, which
+ * leaves triggering the action directly as the only way to reach it.
+ *
+ * Note what this gives up: the menu never opens, so nothing here covers the
+ * menu's own layout or hit-testing, only the action's effect. Controls outside
+ * a menu — including those in Qt::Popup widgets, which do not run a nested
+ * event loop — should still be clicked with real mouse events.
+ *
+ * Throws std::runtime_error if nothing matches, or if the match is disabled.
+ * Triggering skips the enabled check a real mouse event goes through, so
+ * refusing here keeps a test from passing against a row the user could not have
+ * activated.
+ */
+void sketcher_activate_action(const std::string& name_or_text)
+{
+    auto& sketcher = get_sketcher_instance();
+    if (!try_activate_action(sketcher, QString::fromStdString(name_or_text))) {
+        throw std::runtime_error(
+            "playwright test bridge: no action found matching '" +
+            name_or_text + "'");
+    }
 }
 
 #ifdef __EMSCRIPTEN__
@@ -321,5 +338,7 @@ std::string sketcher_get_rect(const std::string& selector)
 EMSCRIPTEN_BINDINGS(sketcher_playwright_test_bridge)
 {
     emscripten::function("_sketcher_get_rect", &sketcher_get_rect);
+    emscripten::function("_sketcher_activate_action",
+                         &sketcher_activate_action);
 }
 #endif

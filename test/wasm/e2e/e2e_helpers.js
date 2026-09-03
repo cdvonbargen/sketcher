@@ -32,6 +32,42 @@ export async function getCanvasCenter(page) {
 }
 
 /**
+ * Call one of the bridge's exported functions and return its result.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} name - the bound function, e.g. "_sketcher_get_rect"
+ * @param {string} arg
+ */
+async function callBridge(page, name, arg) {
+  return page.evaluate(
+    async ({ fn, value }) => {
+      try {
+        // Qt/WASM is built with Asyncify, so a bridge call that unwinds the
+        // stack hands back a promise rather than its value; await covers both.
+        return await Module[fn](value);
+      } catch (e) {
+        // A C++ exception reaches JS as an opaque emscripten value, so decode
+        // it to keep the reason in the test failure. A WASM trap arrives as an
+        // ordinary JS Error instead, and handing one of those to
+        // getExceptionMessage() makes it read unrelated memory and take the
+        // whole renderer down, so only decode what is actually opaque.
+        if (e instanceof Error) {
+          throw e;
+        }
+        let detail;
+        try {
+          detail = Module.getExceptionMessage(e).join(': ');
+        } catch {
+          detail = String(e);
+        }
+        throw new Error(detail);
+      }
+    },
+    { fn: name, value: arg },
+  );
+}
+
+/**
  * Resolve an object selector to {x, y, width, height, enabled} in page
  * coordinates, or null if nothing visible matches.
  *
@@ -41,35 +77,11 @@ export async function getCanvasCenter(page) {
  * and keyboard events.
  *
  * @param {import('@playwright/test').Page} page
- * @param {string} selector - "widget:<objectName>", "action:<objectName or
- *   text>", "atom:<index>", or "bond:<index>"; indices are 0-based indices into
- *   the molecule
+ * @param {string} selector - "widget:<objectName>", "atom:<index>", or
+ *   "bond:<index>"; indices are 0-based indices into the molecule
  */
 async function getRect(page, selector) {
-  const rect = await page.evaluate(async (s) => {
-    try {
-      // Qt/WASM is built with Asyncify. A bridge call that unwinds the stack —
-      // which reading an open menu's geometry does — hands back a Promise
-      // rather than the string, so await covers both cases.
-      return JSON.parse(await Module._sketcher_get_rect(s));
-    } catch (e) {
-      // A C++ exception reaches JS as an opaque emscripten value, so decode it
-      // to keep the reason in the test failure. A WASM trap arrives as an
-      // ordinary JS Error instead, and handing one of those to
-      // getExceptionMessage() makes it read unrelated memory and take the whole
-      // renderer down, so only decode what is actually opaque.
-      if (e instanceof Error) {
-        throw e;
-      }
-      let detail;
-      try {
-        detail = Module.getExceptionMessage(e).join(': ');
-      } catch {
-        detail = String(e);
-      }
-      throw new Error(detail);
-    }
-  }, selector);
+  const rect = JSON.parse(await callBridge(page, '_sketcher_get_rect', selector));
   return rect && rect.width !== undefined ? rect : null;
 }
 
@@ -366,28 +378,22 @@ export async function clickItem(page, kind, index, options) {
 }
 
 /**
- * Click a row of a currently-open menu by its objectName or visible text.
+ * Trigger a menu action by objectName or visible text, without opening its
+ * menu.
  *
- * The menu must already be open — an action has no geometry until its menu is
- * laid out. click() polls, so this tolerates the event-loop turn Qt takes to
- * show the popup after the button that opens it is clicked.
+ * This is the one control that can't be clicked for real. Qt runs a nested
+ * event loop while a QToolButton's menu is open, and because Qt/WASM is built
+ * with Asyncify that leaves the WebAssembly stack suspended — no call into the
+ * module returns until the menu closes, so a test can't even ask where a row
+ * is. Everything else, popup widgets included, gets a real mouse event.
  *
- * @param {import('@playwright/test').Page} page
- * @param {string} nameOrText - objectName, or the row's visible text
- */
-export async function clickAction(page, nameOrText) {
-  await click(page, `action:${nameOrText}`);
-}
-
-/**
- * Hover a row of a currently-open menu to open its submenu.
+ * Throws if no action matches or the match is disabled.
  *
  * @param {import('@playwright/test').Page} page
  * @param {string} nameOrText - objectName, or the row's visible text
  */
-export async function hoverAction(page, nameOrText) {
-  const rect = await waitForClickable(page, `action:${nameOrText}`);
-  await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2, { steps: 4 });
+export async function activateAction(page, nameOrText) {
+  await callBridge(page, '_sketcher_activate_action', nameOrText);
 }
 
 /**

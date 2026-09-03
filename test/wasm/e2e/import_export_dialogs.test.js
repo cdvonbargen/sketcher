@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
-  clickAction,
+  activateAction,
   clickWidget,
   getExportedSmiles,
   isSketcherEmpty,
@@ -18,8 +18,7 @@ import {
  * loadStructure() so that the dialog isn't an unrelated dependency.
  */
 async function importTextViaDialog(page, text) {
-  await clickWidget(page, 'import_btn');
-  await clickAction(page, 'Paste in Text...');
+  await activateAction(page, 'Paste in Text...');
   await setWidgetText(page, 'structure_text_edit', text);
 
   // The generated Qt button box has no stable child object name for its OK

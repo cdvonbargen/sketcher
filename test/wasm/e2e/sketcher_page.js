@@ -11,12 +11,11 @@
  * interaction has been implemented with real browser input.
  */
 import {
-  clickAction,
+  activateAction,
   clickWidget,
   focusCanvas,
   getClipboardText,
   getDrawingAreaCenter,
-  hoverAction,
   loadStructure,
   mouseClick,
   mouseDrag,
@@ -46,10 +45,15 @@ const TOOL_NAMES = {
   rect_btn: 'select_tool_btn',
 };
 
-// Submenu parents in the More Actions menu. Passing one of these as the only
-// argument opens its submenu without choosing a row, matching Squish.
+// Submenu parents in the More Actions menu. In Squish, passing one of these as
+// the only argument opens its submenu without choosing a row; here it does
+// nothing, since no menu is opened.
 const SUBMENU_PARENTS = new Set(['copy_all_as', 'modify_all']);
 
+// Rows are addressed by their action's text, since menu actions are created
+// without an objectName. Note that the copy rows are relabelled to "Copy" and
+// "Copy As" while something is selected, so these names only resolve with an
+// empty selection.
 const MORE_ACTION_NAMES = {
   add_explicit_hydrogens: 'Add Explicit Hydrogens',
   aromatize: 'Aromatize',
@@ -70,7 +74,7 @@ const MORE_ACTION_NAMES = {
   undo: 'Undo',
 };
 
-const COPY_ALL_AS_NAMES = {
+const COPY_AS_NAMES = {
   cxsmi: 'Extended SMILES',
   inchikey: 'InChIKey',
   inchi: 'InChI',
@@ -127,25 +131,29 @@ export class Sketcher {
     this.current_tool = tool;
   }
 
-  /** Equivalent to Squish `more_actions_menu(button1, button2=None)`. */
+  /**
+   * Equivalent to Squish `more_actions_menu(button1, button2=None)`.
+   *
+   * The menu is never opened. Qt runs a nested event loop for as long as a
+   * QToolButton's menu is showing, which under Asyncify suspends the whole WASM
+   * module, so a test cannot locate a row to click it — see activateAction.
+   * Opening a submenu is therefore a no-op here, and only the leaf row matters.
+   */
   async more_actions_menu(button1, button2 = null) {
-    await clickWidget(this.page, 'more_actions_btn');
-    const parent = MORE_ACTION_NAMES[button1] || button1;
     if (SUBMENU_PARENTS.has(button1)) {
-      // A submenu opens on hover, just as it does for a user. Its rows only
-      // exist once it is laid out, so clickAction below polls for them.
-      await hoverAction(this.page, parent);
       if (button2 === null) {
         return;
       }
-      const child = MORE_ACTION_NAMES[button2] || COPY_ALL_AS_NAMES[button2] || button2;
-      await clickAction(this.page, child);
+      await activateAction(
+        this.page,
+        MORE_ACTION_NAMES[button2] || COPY_AS_NAMES[button2] || button2,
+      );
       return;
     }
     if (button2 !== null) {
       throw new Error(`More Actions row "${button1}" has no submenu`);
     }
-    await clickAction(this.page, parent);
+    await activateAction(this.page, MORE_ACTION_NAMES[button1] || button1);
   }
 
   /** Equivalent to Squish `getClipboardText()` after Copy/Cut actions. */

@@ -86,7 +86,8 @@ test.describe('More Actions menu', () => {
     });
     await test.step('Ctrl_C_hotkey', async () => {
       await sk.type_text('sketcher_area', '<Ctrl+C>');
-      await expect(await sk.clipboard_text()).toContain('V3000');
+      // The copy writes to navigator.clipboard asynchronously, so poll for it
+      await expect.poll(() => sk.clipboard_text(), { timeout: 5000 }).toContain('V3000');
     });
     await test.step('Ctrl_F_hotkey', async () => {
       await sk.click_button('clear_selection');
