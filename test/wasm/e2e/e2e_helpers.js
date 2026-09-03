@@ -101,16 +101,28 @@ export async function requireRect(page, selector) {
 }
 
 /**
- * Return a widget's state, failing if it isn't visible.
+ * Return a widget's state, failing if no widget has that objectName.
  *
- * Alongside the rect, a button reports "enabled", "checked", and "text", which
- * is how a test asserts that a shortcut selected the tool it should have.
+ * A button reports "enabled", "checked", "text", and "visible", which is how a
+ * test asserts that a shortcut selected the tool it should have. This matches a
+ * hidden widget too, since a tool inside a closed popup is still the tool the
+ * shortcut is meant to have chosen.
  *
  * @param {import('@playwright/test').Page} page
  * @param {string} name - a Qt objectName
  */
 export async function widgetState(page, name) {
-  return requireRect(page, `widget:${name}`);
+  return requireRect(page, `state:${name}`);
+}
+
+/**
+ * Whether a widget is currently on screen, and so can be clicked.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} name - a Qt objectName
+ */
+export async function isWidgetVisible(page, name) {
+  return (await getRect(page, `widget:${name}`)) !== null;
 }
 
 /**
@@ -123,7 +135,10 @@ export async function getDrawingAreaCenter(page) {
 }
 
 /**
- * Replace the current structure, bypassing the import UI.
+ * Add a structure to the canvas, bypassing the import UI.
+ *
+ * This adds rather than replaces, so clear the canvas first if the test wants
+ * the structure on its own.
  *
  * This is fixture setup, not an assertion of the Import flow; a test that
  * covers importing should drive the dialog instead.

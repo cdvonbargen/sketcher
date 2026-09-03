@@ -18,6 +18,7 @@ import {
   focusCanvas,
   getClipboardText,
   getDrawingAreaCenter,
+  isWidgetVisible,
   loadStructure,
   mouseClick,
   mouseDrag,
@@ -173,8 +174,11 @@ export class Sketcher {
   /**
    * Equivalent to Squish `click_tool(tool, click_and_hold=False)`.
    *
-   * `click_and_hold` marks a tool that lives in a popup, which only appears
-   * while its owning button is held down -- see clickPopupTool.
+   * A tool that isn't on the toolbar lives in a popup that only appears while
+   * its owning button is held down, and is reached that way automatically --
+   * see clickPopupTool. Pass `click_and_hold` to force the popup even for a
+   * tool that is showing, which is how a test picks a specific shape from a
+   * button that currently stands for a different one.
    */
   async click_tool(tool, click_and_hold = false) {
     // Squish tracks sticky tools and avoids re-clicking the current tool.
@@ -182,10 +186,11 @@ export class Sketcher {
     if (this.current_tool === tool) {
       return;
     }
-    if (click_and_hold) {
-      await clickPopupTool(this.page, widgetName(tool));
+    const name = widgetName(tool);
+    if (click_and_hold || !(await isWidgetVisible(this.page, name))) {
+      await clickPopupTool(this.page, name);
     } else {
-      await clickWidget(this.page, widgetName(tool));
+      await clickWidget(this.page, name);
     }
     this.current_tool = tool;
   }
@@ -278,17 +283,26 @@ export class Sketcher {
     return getClipboardText(this.page);
   }
 
-  /** Equivalent to Squish `type_text("sketcher_area", "<Ctrl+X>")`. */
+  /**
+   * Equivalent to Squish `type_text("sketcher_area", text)`.
+   *
+   * Squish writes a named key or chord in angle brackets, as in "<Ctrl+X>" or
+   * "<Backspace>", and anything else literally.
+   */
   async type_text(object_name, text) {
     if (object_name !== 'sketcher_area') {
       throw new Error(`Standalone type_text does not yet support: ${object_name}`);
     }
     await focusCanvas(this.page);
-    const shortcut = String(text)
-      .replace(/^<Ctrl\+/, 'Control+')
-      .replace(/^<Ctrl\+Shift\+/, 'Control+Shift+')
-      .replace(/>$/, '');
-    await this.page.keyboard.press(shortcut);
+    const source = String(text);
+    const bracketed = source.match(/^<(.+)>$/);
+    if (bracketed) {
+      await this.page.keyboard.press(bracketed[1].replace(/\bCtrl\b/g, 'Control'));
+      return;
+    }
+    // Typed rather than pressed, so that a key like "+" isn't read as the
+    // separator in a modifier chord.
+    await this.page.keyboard.type(source);
   }
 
   /** Equivalent to `mouse_drag` using source coordinates relative to canvas center. */
@@ -349,22 +363,47 @@ export class Sketcher {
     return targets;
   }
 
+  /**
+   * The center of a recorded rect, in page coordinates, optionally offset.
+   *
+   * The offset is how a test aims at something positioned relative to an item
+   * rather than at the item itself, such as the rotation handle beside a
+   * selection.
+   */
+  center_of(rect, dx = 0, dy = 0) {
+    return { x: rect.x + rect.width / 2 + dx, y: rect.y + rect.height / 2 + dy };
+  }
+
+  /** Drag between two page points. */
+  async drag(from, to, modifier = null) {
+    await mouseDrag(this.page, from, to, { modifiers: modifiersFor(modifier) });
+  }
+
   /** Click a point recorded by capture_rendered_targets or rendered_object_rect. */
   async click_rendered_target(rect, modifier = null) {
-    await mouseClick(this.page, rect.x + rect.width / 2, rect.y + rect.height / 2, {
-      modifiers: modifiersFor(modifier),
-    });
+    const point = this.center_of(rect);
+    await mouseClick(this.page, point.x, point.y, { modifiers: modifiersFor(modifier) });
+  }
+
+  /** Move the pointer over a point recorded by rendered_object_rect. */
+  async hover_rendered_target(rect) {
+    const point = this.center_of(rect);
+    await this.page.mouse.move(point.x, point.y, { steps: 4 });
+  }
+
+  /** Double-click a point recorded by rendered_object_rect. */
+  async double_click_rendered_target(rect) {
+    const point = this.center_of(rect);
+    await this.page.mouse.dblclick(point.x, point.y);
+  }
+
+  /** Drag from the center of one recorded point to the center of another. */
+  async drag_between_rendered_targets(from, to, modifier = null) {
+    await this.drag(this.center_of(from), this.center_of(to), modifier);
   }
 
   /** Drag by (dx, dy) from a recorded point. */
   async drag_from_rendered_target(rect, dx, dy, modifier = null) {
-    const x = rect.x + rect.width / 2;
-    const y = rect.y + rect.height / 2;
-    await mouseDrag(
-      this.page,
-      { x, y },
-      { x: x + dx, y: y + dy },
-      { modifiers: modifiersFor(modifier) },
-    );
+    await this.drag(this.center_of(rect), this.center_of(rect, dx, dy), modifier);
   }
 }

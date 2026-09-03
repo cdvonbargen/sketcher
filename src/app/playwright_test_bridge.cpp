@@ -217,23 +217,37 @@ QGraphicsItem* find_visible_item(const QGraphicsView& view, const bool is_atom,
 }
 
 /**
- * Resolve a "widget:<objectName>" selector, or "{}" if no visible widget
- * matches.
+ * Resolve a "widget:<objectName>" or "state:<objectName>" selector, or "{}" if
+ * nothing matches.
  *
- * A button also reports "checked" and "text", which is how a test asserts that
- * a shortcut selected the tool it should have.
+ * "widget" only matches a visible widget, since that is what a test can click.
+ * "state" matches whether or not the widget is showing and reports "visible",
+ * which is how a test asserts that a shortcut selected a tool that lives in a
+ * closed popup. A button also reports "checked" and "text".
  */
-std::string widget_rect(SketcherWidget& sketcher, const std::string& name)
+std::string widget_rect(SketcherWidget& sketcher, const std::string& name,
+                        const bool visible_only)
 {
-    auto* widget = find_visible_widget(sketcher, QString::fromStdString(name));
+    const auto object_name = QString::fromStdString(name);
+    auto* widget = find_visible_widget(sketcher, object_name);
     if (widget == nullptr) {
-        return "{}";
+        if (visible_only) {
+            return "{}";
+        }
+        widget = sketcher.findChild<QWidget*>(object_name);
+        if (widget == nullptr) {
+            return "{}";
+        }
     }
     auto result = rect_json(map_to_sketcher(*widget, sketcher, QPoint(0, 0)),
                             widget->size(), widget->isEnabled());
+    if (!visible_only) {
+        result["visible"] = widget->isVisible();
+    }
     if (auto* button = qobject_cast<QAbstractButton*>(widget)) {
         result["checked"] = button->isChecked();
         result["text"] = without_mnemonic(button->text());
+        result["toolTip"] = button->toolTip();
     }
     return to_json(result);
 }
@@ -363,10 +377,17 @@ bool try_activate_action(SketcherWidget& sketcher, const QString& name)
  *
  * Supported selectors:
  *
- *   "widget:<objectName>"  a QWidget, by its Qt objectName
+ *   "widget:<objectName>"  a visible QWidget, by its Qt objectName
+ *   "state:<objectName>"   the same, but matching a hidden widget too
  *   "atom:<index>"         an atom of the current molecule, by model index
  *   "bond:<index>"         a bond of the current molecule, by model index
  *   "menu:<name or text>"  a row of an open context menu, by objectName or text
+ *
+ * Use "widget:" to find something to click, since only a visible widget can be
+ * clicked. Use "state:" to ask whether a control is checked or enabled when it
+ * may be out of sight, such as a tool inside a closed popup; it adds "visible"
+ * to the result. A button of either kind also reports "checked", "text", and
+ * "toolTip".
  *
  * A "menu:" selector only resolves while the menu is on screen, so open the
  * menu first. It does not reach a QToolButton's menu, which cannot be open and
@@ -396,8 +417,8 @@ std::string sketcher_get_rect(const std::string& selector)
 {
     const auto [kind, value] = split_selector(selector);
     auto& sketcher = get_sketcher_instance();
-    if (kind == "widget") {
-        return widget_rect(sketcher, value);
+    if (kind == "widget" || kind == "state") {
+        return widget_rect(sketcher, value, kind == "widget");
     }
     if (kind == "atom" || kind == "bond") {
         return item_rect(sketcher, kind == "atom", value);
@@ -407,7 +428,7 @@ std::string sketcher_get_rect(const std::string& selector)
     }
     throw std::runtime_error(
         "playwright test bridge: unrecognized selector kind '" + kind +
-        "' (expected 'widget', 'atom', 'bond', or 'menu')");
+        "' (expected 'widget', 'state', 'atom', 'bond', or 'menu')");
 }
 
 /**
