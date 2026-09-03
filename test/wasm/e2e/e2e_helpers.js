@@ -101,6 +101,19 @@ export async function requireRect(page, selector) {
 }
 
 /**
+ * Return a widget's state, failing if it isn't visible.
+ *
+ * Alongside the rect, a button reports "enabled", "checked", and "text", which
+ * is how a test asserts that a shortcut selected the tool it should have.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} name - a Qt objectName
+ */
+export async function widgetState(page, name) {
+  return requireRect(page, `widget:${name}`);
+}
+
+/**
  * Return the {x, y} center of the drawing area (excluding toolbar and top bar).
  * @param {import('@playwright/test').Page} page
  */

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { hideMouseMarker } from './e2e_helpers.js';
+import { hideMouseMarker, isSketcherEmpty } from './e2e_helpers.js';
 import { Sketcher } from './sketcher_page.js';
 
 const SOURCE_STRUCTURE = 'NC(N)=NC(=O)CC1=C(Cl)C=CC=C1Cl';
@@ -130,6 +130,14 @@ test.describe('More Actions menu', () => {
     ]) {
       await test.step(action, async () => {
         await sk.more_actions_menu(action);
+        if (action === 'cut' || action === 'paste') {
+          // Cut and paste both go through navigator.clipboard, which resolves a
+          // turn or more after the action returns. Wait for the structure to
+          // actually come or go, or a screenshot can catch the state in between.
+          await expect
+            .poll(() => isSketcherEmpty(page), { timeout: 10_000 })
+            .toBe(action === 'cut');
+        }
         if (reference !== null) {
           await checkpoint(page, reference);
         }

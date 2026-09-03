@@ -13,37 +13,40 @@
 import {
   activateAction,
   clickWidget,
+  contextMenuAction,
   focusCanvas,
   getClipboardText,
   getDrawingAreaCenter,
   loadStructure,
   mouseClick,
   mouseDrag,
+  openContextMenu,
   requireRect,
   waitForSketcherReady,
+  widgetState,
 } from './e2e_helpers.js';
 
-const BUTTON_NAMES = {
-  clear: 'clear_btn',
-  clear_selection: 'clear_selection_btn',
-  invert_selection: 'invert_selection_btn',
-  move_rotate: 'move_rotate_btn',
-  select_all: 'select_all_btn',
-  undo: 'undo_btn',
+/**
+ * Squish names for buttons and tools whose Qt objectName is not simply the
+ * lowercased name with a "_btn" suffix. Everything else -- every element, ring,
+ * and bond-order tool -- follows that rule and needs no entry here.
+ */
+const WIDGET_NAMES = {
+  down: 'stereo_bond2_btn',
+  minus_charge: 'decrease_charge_btn',
+  plus_charge: 'increase_charge_btn',
+  rect_btn: 'select_tool_btn',
+  single: 'single_bond_btn',
+  up: 'stereo_bond1_btn',
 };
 
-const TOOL_NAMES = {
-  C: 'c_btn',
-  Cl: 'cl_btn',
-  N: 'n_btn',
-  O: 'o_btn',
-  P: 'p_btn',
-  S: 's_btn',
-  F: 'f_btn',
-  H: 'h_btn',
-  move_rotate: 'move_rotate_btn',
-  rect_btn: 'select_tool_btn',
-};
+function widgetName(name) {
+  if (WIDGET_NAMES[name]) {
+    return WIDGET_NAMES[name];
+  }
+  const lowered = String(name).toLowerCase();
+  return lowered.endsWith('_btn') ? lowered : `${lowered}_btn`;
+}
 
 // Submenu parents in the More Actions menu. In Squish, passing one of these as
 // the only argument opens its submenu without choosing a row; here it does
@@ -83,6 +86,52 @@ const COPY_AS_NAMES = {
   smi: 'SMILES',
 };
 
+// Context menu rows whose visible text isn't just the Squish name title-cased.
+const CONTEXT_MENU_NAMES = {
+  copy_as: 'Copy As',
+  modify_atoms: 'Modify Atoms',
+  modify_bonds: 'Modify Bonds',
+  replace_atoms_with: 'Replace Atoms with',
+  set_element: 'Set Element',
+  wildcard: 'Wildcard',
+  other_type: 'Other Type',
+  single_up_down: 'Single Up/Down',
+  double_cis_trans: 'Double Cis/Trans',
+  zero_order: 'Zero Order',
+  '+_charge': '+ Charge',
+  '–_charge': '– Charge',
+  add_explicit_hydrogens: 'Add Explicit Hydrogens',
+  remove_explicit_hydrogens: 'Remove Explicit Hydrogens',
+  add_unpaired_electron: 'Add Unpaired Electron',
+  remove_unpaired_electron: 'Remove Unpaired Electron',
+  A: 'A (Any heavy atom)',
+  AH: 'AH (Any or H)',
+  Q: 'Q (Heteroatom)',
+  QH: 'QH (Hetero or H)',
+  M: 'M (Metal)',
+  MH: 'MH (Metal or H)',
+  X: 'X (Halogen)',
+  XH: 'XH (Halogen or H)',
+};
+
+/**
+ * Squish refers to a row by a snake_case name; Qt matches on visible text.
+ *
+ * A name that isn't snake_case is already the visible text and is passed
+ * through untouched, since title-casing it would corrupt labels that contain a
+ * lowercase word, such as "Not In a Ring".
+ */
+function contextMenuLabel(name) {
+  const mapped = CONTEXT_MENU_NAMES[name] || COPY_AS_NAMES[name];
+  if (mapped) {
+    return mapped;
+  }
+  if (!/^[a-z0-9_]+$/.test(name)) {
+    return name;
+  }
+  return name.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function modifiersFor(modifier) {
   if (modifier === 'shift') {
     return ['Shift'];
@@ -114,7 +163,7 @@ export class Sketcher {
 
   /** Equivalent to Squish `click_button(object_name)`. */
   async click_button(object_name) {
-    await clickWidget(this.page, BUTTON_NAMES[object_name] || object_name);
+    await clickWidget(this.page, widgetName(object_name));
     if (object_name === 'clear') {
       this.current_tool = null;
     }
@@ -127,7 +176,7 @@ export class Sketcher {
     if (this.current_tool === tool) {
       return;
     }
-    await clickWidget(this.page, TOOL_NAMES[tool] || tool);
+    await clickWidget(this.page, widgetName(tool));
     this.current_tool = tool;
   }
 
@@ -154,6 +203,64 @@ export class Sketcher {
       throw new Error(`More Actions row "${button1}" has no submenu`);
     }
     await activateAction(this.page, MORE_ACTION_NAMES[button1] || button1);
+  }
+
+  /**
+   * Equivalent to Squish `selection_context_menu(target, *actions)`.
+   *
+   * Right-clicks the target atom or bond, then walks the given rows. Unlike the
+   * More Actions menu this is a real gesture throughout — see contextMenuAction.
+   *
+   * @param {{type: 'atom'|'bond', index: number}} target - Squish numbering
+   * @param {...string} path - Squish row names, outermost first
+   */
+  async selection_context_menu(target, ...path) {
+    await contextMenuAction(
+      this.page,
+      `${target.type}:${target.index - 1}`,
+      ...path.map(contextMenuLabel),
+    );
+  }
+
+  /**
+   * Open a context menu and leave it showing, so a test can screenshot it.
+   *
+   * @param {{type: 'atom'|'bond', index: number}} target - Squish numbering
+   * @param {...string} path - Squish row names to hover, outermost first
+   */
+  async open_selection_context_menu(target, ...path) {
+    await openContextMenu(
+      this.page,
+      `${target.type}:${target.index - 1}`,
+      ...path.map(contextMenuLabel),
+    );
+  }
+
+  /** The Qt objectName Squish's name for a tool resolves to. */
+  tool_widget_name(tool) {
+    return widgetName(tool);
+  }
+
+  /** Equivalent to Squish `widget_state(object_name)`. */
+  async widget_state(object_name) {
+    return widgetState(this.page, widgetName(object_name));
+  }
+
+  /** Move the pointer to a point relative to the drawing area center. */
+  async mouse_move(x, y) {
+    const center = await getDrawingAreaCenter(this.page);
+    await this.page.mouse.move(center.x + x, center.y + y, { steps: 4 });
+  }
+
+  /** Equivalent to Squish `click_sketcher(x, y)`, relative to the area center. */
+  async click_sketcher(x, y) {
+    const center = await getDrawingAreaCenter(this.page);
+    await mouseClick(this.page, center.x + x, center.y + y);
+  }
+
+  /** Clear the canvas and forget the sticky tool, between phases of a test. */
+  async reset_state() {
+    await this.click_button('clear');
   }
 
   /** Equivalent to Squish `getClipboardText()` after Copy/Cut actions. */
@@ -198,14 +305,56 @@ export class Sketcher {
   /**
    * The bridge maps the live QGraphicsItem through QGraphicsView, which avoids
    * the fragile SDF-coordinate-to-pixel calculation in Squish.
+   *
+   * Squish numbers atoms and bonds from one, while the bridge takes the RDKit
+   * model index, so the index is shifted here rather than in every ported test.
    */
   async click_item(type, index, select, modifier) {
     if (select) {
       await this.click_tool('rect_btn');
     }
-    const rect = await requireRect(this.page, `${type}:${index}`);
+    const rect = await requireRect(this.page, `${type}:${index - 1}`);
     await mouseClick(this.page, rect.x + rect.width / 2, rect.y + rect.height / 2, {
       modifiers: modifiersFor(modifier),
     });
+  }
+
+  /** Where an atom or bond is drawn right now, in page coordinates. */
+  async rendered_object_rect(type, index) {
+    return requireRect(this.page, `${type}:${index - 1}`);
+  }
+
+  /**
+   * Record where several items are drawn before editing starts.
+   *
+   * Erasing an atom or bond renumbers every item after it, so a test that
+   * deletes a series of them has to resolve all their positions up front and
+   * then click the recorded points.
+   */
+  async capture_rendered_targets(type, indexes) {
+    const targets = new Map();
+    for (const index of indexes) {
+      targets.set(index, await this.rendered_object_rect(type, index));
+    }
+    return targets;
+  }
+
+  /** Click a point recorded by capture_rendered_targets or rendered_object_rect. */
+  async click_rendered_target(rect, modifier = null) {
+    await mouseClick(this.page, rect.x + rect.width / 2, rect.y + rect.height / 2, {
+      modifiers: modifiersFor(modifier),
+    });
+  }
+
+  /** Drag by (dx, dy) from a recorded point. */
+  async drag_from_rendered_target(rect, dx, dy, modifier = null) {
+    const x = rect.x + rect.width / 2;
+    const y = rect.y + rect.height / 2;
+    await mouseDrag(
+      this.page,
+      { x, y },
+      { x: x + dx, y: y + dy },
+      { modifiers: modifiersFor(modifier) },
+    );
   }
 }

@@ -40,6 +40,7 @@
 #include <string>
 #include <utility>
 
+#include <QAbstractButton>
 #include <QAction>
 #include <QApplication>
 #include <QGraphicsItem>
@@ -74,8 +75,8 @@ std::string to_json(const QJsonObject& object)
     return QJsonDocument(object).toJson(QJsonDocument::Compact).toStdString();
 }
 
-std::string rect_to_json(const QPoint& top_left, const QSize& size,
-                         const bool enabled)
+QJsonObject rect_json(const QPoint& top_left, const QSize& size,
+                      const bool enabled)
 {
     QJsonObject result;
     result["x"] = top_left.x();
@@ -83,7 +84,13 @@ std::string rect_to_json(const QPoint& top_left, const QSize& size,
     result["width"] = size.width();
     result["height"] = size.height();
     result["enabled"] = enabled;
-    return to_json(result);
+    return result;
+}
+
+std::string rect_to_json(const QPoint& top_left, const QSize& size,
+                         const bool enabled)
+{
+    return to_json(rect_json(top_left, size, enabled));
 }
 
 /**
@@ -187,6 +194,9 @@ QGraphicsItem* find_visible_item(const QGraphicsView& view, const bool is_atom,
 /**
  * Resolve a "widget:<objectName>" selector, or "{}" if no visible widget
  * matches.
+ *
+ * A button also reports "checked" and "text", which is how a test asserts that
+ * a shortcut selected the tool it should have.
  */
 std::string widget_rect(SketcherWidget& sketcher, const std::string& name)
 {
@@ -194,8 +204,13 @@ std::string widget_rect(SketcherWidget& sketcher, const std::string& name)
     if (widget == nullptr) {
         return "{}";
     }
-    return rect_to_json(map_to_sketcher(*widget, sketcher, QPoint(0, 0)),
-                        widget->size(), widget->isEnabled());
+    auto result = rect_json(map_to_sketcher(*widget, sketcher, QPoint(0, 0)),
+                            widget->size(), widget->isEnabled());
+    if (auto* button = qobject_cast<QAbstractButton*>(widget)) {
+        result["checked"] = button->isChecked();
+        result["text"] = without_mnemonic(button->text());
+    }
+    return to_json(result);
 }
 
 /**
