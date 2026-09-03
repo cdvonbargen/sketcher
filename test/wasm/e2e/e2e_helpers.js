@@ -377,6 +377,37 @@ export async function clickWidget(page, name, options) {
   await click(page, `widget:${name}`, options);
 }
 
+// ToolButtonWithPopup opens its popup 250 ms after the press, and a release
+// before then cancels it, so hold well past that.
+const POPUP_HOLD_MS = 600;
+
+/**
+ * Click a tool that lives in a button's press-and-hold popup.
+ *
+ * The bridge is asked which button owns the popup so that tests don't have to
+ * carry a map of every tool to the button hiding it. The popup is a plain
+ * widget rather than a QMenu, so it doesn't run a nested event loop and its
+ * contents can be located and clicked normally once it's open.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} name - Qt objectName of the tool inside the popup
+ */
+export async function clickPopupTool(page, name) {
+  const owner = await callBridge(page, '_sketcher_get_popup_owner', name);
+  if (!owner) {
+    throw new Error(`"${name}" is not visible and is not inside a popup`);
+  }
+  const rect = await waitForClickable(page, `widget:${owner}`);
+  const x = rect.x + rect.width / 2;
+  const y = rect.y + rect.height / 2;
+  await showMouseMarker(page, x, y);
+  await page.mouse.move(x, y, { steps: 4 });
+  await page.mouse.down();
+  await page.waitForTimeout(POPUP_HOLD_MS);
+  await page.mouse.up();
+  await click(page, `widget:${name}`);
+}
+
 /**
  * Click an atom or bond by its index in the molecule.
  *

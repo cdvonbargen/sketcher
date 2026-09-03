@@ -61,11 +61,13 @@
 #include "schrodinger/sketcher/molviewer/abstract_atom_or_monomer_item.h"
 #include "schrodinger/sketcher/molviewer/abstract_bond_or_connector_item.h"
 #include "schrodinger/sketcher/sketcher_widget.h"
+#include "schrodinger/sketcher/widget/tool_button_with_popup.h"
 #include "sketcher_instance.h"
 
 using schrodinger::sketcher::AbstractAtomOrMonomerItem;
 using schrodinger::sketcher::AbstractBondOrConnectorItem;
 using schrodinger::sketcher::SketcherWidget;
+using schrodinger::sketcher::ToolButtonWithPopup;
 
 namespace
 {
@@ -130,6 +132,29 @@ QWidget* find_visible_widget(SketcherWidget& sketcher, const QString& name)
         }
     }
     return nullptr;
+}
+
+/**
+ * Find the button whose popup contains the named widget, or "" if the widget
+ * isn't in a popup at all.
+ *
+ * Many tools live in a popup that only appears while its button is pressed and
+ * held, so a test that wants such a tool has to know which button to hold.
+ * Deriving that from the widget tree keeps tests from carrying a hand-written
+ * map of every tool to its owning button.
+ */
+std::string popup_owner(SketcherWidget& sketcher, const std::string& name)
+{
+    const auto wanted = QString::fromStdString(name);
+    for (auto* button : sketcher.findChildren<ToolButtonWithPopup*>()) {
+        auto* popup = button->getPopupWidget();
+        if (popup != nullptr &&
+            (popup->objectName() == wanted ||
+             popup->findChild<QWidget*>(wanted) != nullptr)) {
+            return button->objectName().toStdString();
+        }
+    }
+    return {};
 }
 
 /**
@@ -417,6 +442,18 @@ void sketcher_activate_action(const std::string& name_or_text)
     }
 }
 
+/**
+ * Return the objectName of the button whose popup holds the named widget, or an
+ * empty string if it isn't in a popup.
+ *
+ * A test uses this to find the button it has to press and hold before a tool
+ * becomes visible and clickable.
+ */
+std::string sketcher_get_popup_owner(const std::string& name)
+{
+    return popup_owner(get_sketcher_instance(), name);
+}
+
 #ifdef __EMSCRIPTEN__
 // A second bindings block alongside the one in main.cpp; embind allows any
 // number of them as long as each has a distinct name. This object file is
@@ -427,5 +464,7 @@ EMSCRIPTEN_BINDINGS(sketcher_playwright_test_bridge)
     emscripten::function("_sketcher_get_rect", &sketcher_get_rect);
     emscripten::function("_sketcher_activate_action",
                          &sketcher_activate_action);
+    emscripten::function("_sketcher_get_popup_owner",
+                         &sketcher_get_popup_owner);
 }
 #endif

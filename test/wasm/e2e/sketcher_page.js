@@ -12,6 +12,7 @@
  */
 import {
   activateAction,
+  clickPopupTool,
   clickWidget,
   contextMenuAction,
   focusCanvas,
@@ -169,14 +170,23 @@ export class Sketcher {
     }
   }
 
-  /** Equivalent to Squish `click_tool(tool, click_and_hold=False)`. */
-  async click_tool(tool, _click_and_hold = false) {
+  /**
+   * Equivalent to Squish `click_tool(tool, click_and_hold=False)`.
+   *
+   * `click_and_hold` marks a tool that lives in a popup, which only appears
+   * while its owning button is held down -- see clickPopupTool.
+   */
+  async click_tool(tool, click_and_hold = false) {
     // Squish tracks sticky tools and avoids re-clicking the current tool.
     // In particular, repeated rect_btn clicks interrupt Shift-add selection.
     if (this.current_tool === tool) {
       return;
     }
-    await clickWidget(this.page, widgetName(tool));
+    if (click_and_hold) {
+      await clickPopupTool(this.page, widgetName(tool));
+    } else {
+      await clickWidget(this.page, widgetName(tool));
+    }
     this.current_tool = tool;
   }
 
