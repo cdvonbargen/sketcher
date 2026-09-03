@@ -46,13 +46,28 @@ export async function getCanvasCenter(page) {
  *   the molecule
  */
 async function getRect(page, selector) {
-  const rect = await page.evaluate((s) => {
+  const rect = await page.evaluate(async (s) => {
     try {
-      return JSON.parse(Module._sketcher_get_rect(s));
+      // Qt/WASM is built with Asyncify. A bridge call that unwinds the stack —
+      // which reading an open menu's geometry does — hands back a Promise
+      // rather than the string, so await covers both cases.
+      return JSON.parse(await Module._sketcher_get_rect(s));
     } catch (e) {
       // A C++ exception reaches JS as an opaque emscripten value, so decode it
-      // to keep the reason in the test failure
-      throw new Error(Module.getExceptionMessage(e).join(': '));
+      // to keep the reason in the test failure. A WASM trap arrives as an
+      // ordinary JS Error instead, and handing one of those to
+      // getExceptionMessage() makes it read unrelated memory and take the whole
+      // renderer down, so only decode what is actually opaque.
+      if (e instanceof Error) {
+        throw e;
+      }
+      let detail;
+      try {
+        detail = Module.getExceptionMessage(e).join(': ');
+      } catch {
+        detail = String(e);
+      }
+      throw new Error(detail);
     }
   }, selector);
   return rect && rect.width !== undefined ? rect : null;

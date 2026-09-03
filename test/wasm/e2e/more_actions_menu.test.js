@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { hideMouseMarker } from './e2e_helpers.js';
-import { Sketcher } from './squish_sketcher.js';
+import { Sketcher } from './sketcher_page.js';
 
 const SOURCE_STRUCTURE = 'NC(N)=NC(=O)CC1=C(Cl)C=CC=C1Cl';
 
@@ -27,8 +27,8 @@ async function selectSourceAtomsAndBonds(sk) {
   }
 }
 
-test.describe('tst_more_actions_menu', () => {
-  test('main', async ({ page }, testInfo) => {
+test.describe('More Actions menu', () => {
+  test('applies each menu row in sequence', async ({ page }, testInfo) => {
     const sk = new Sketcher(page);
     await sk.open();
     await requireTestBridge(page);

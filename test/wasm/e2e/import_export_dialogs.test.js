@@ -32,7 +32,7 @@ test.beforeEach(async ({ page }) => {
   await waitForSketcherReady(page);
 });
 
-test.describe.skip('ported Squish import and export', () => {
+test.describe.skip('import and export dialogs', () => {
   // Re-enable after the standalone WASM import/export dialogs have stable
   // browser-side geometry for real click-and-type interaction. These tests
   // must not use the fixture loader because they cover the UI flow itself.

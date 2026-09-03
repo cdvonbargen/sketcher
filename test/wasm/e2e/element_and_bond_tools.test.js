@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
   await waitForSketcherReady(page);
 });
 
-test.describe('ported Squish tools and shortcuts', () => {
+test.describe('element and bond tools', () => {
   // Source coverage: tst_tools and tst_hidden_shortcuts.
   for (const [key, expectedSmiles] of [
     ['N', 'N'],

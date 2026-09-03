@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
   await waitForSketcherReady(page);
 });
 
-test.describe('ported Squish canvas editing', () => {
+test.describe('canvas editing', () => {
   // Source coverage: tst_erase_mode, tst_move_mode, and tst_select_mode_*.
   test('erase tool removes a placed atom', async ({ page }) => {
     const center = await getDrawingAreaCenter(page);

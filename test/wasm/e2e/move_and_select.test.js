@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { getExportedSmiles, requireRect } from './e2e_helpers.js';
-import { Sketcher } from './squish_sketcher.js';
+import { Sketcher } from './sketcher_page.js';
 
 const SOURCE_STRUCTURE = 'NC(N)=NC(=O)CC1=C(Cl)C=CC=C1Cl';
 
@@ -9,7 +9,7 @@ async function requireTestBridge(page) {
   test.skip(!available, 'requires a WASM artifact built with playwright_test_bridge.cpp');
 }
 
-test.describe('ported tst_move_mode and tst_select_mode_active_selection', () => {
+test.describe('move and select', () => {
   test.beforeEach(async ({ page }) => {
     const sk = new Sketcher(page);
     await sk.open();
