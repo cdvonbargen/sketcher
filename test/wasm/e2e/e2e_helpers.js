@@ -378,6 +378,91 @@ export async function clickItem(page, kind, index, options) {
 }
 
 /**
+ * Move the pointer over whatever a selector resolves to.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} selector - see getRect
+ */
+async function hover(page, selector) {
+  const rect = await waitForClickable(page, selector);
+  const x = rect.x + rect.width / 2;
+  const y = rect.y + rect.height / 2;
+  await showMouseMarker(page, x, y);
+  await page.mouse.move(x, y, { steps: 4 });
+}
+
+/**
+ * Open a context menu by right-clicking whatever a selector resolves to, then
+ * walk a path of rows: every row but the last is hovered to open its submenu,
+ * and the last is clicked.
+ *
+ * Unlike the More Actions menu, a context menu can be driven for real. The
+ * sketcher shows one with QMenu::show() rather than exec(), so it doesn't run
+ * the nested event loop that would otherwise suspend the WASM module — see
+ * activateAction.
+ *
+ * The whole gesture is retried, because Qt/WASM can take a frame to put the
+ * popup up and a half-open menu resolves no rows. Reopening replays the same
+ * user actions rather than falling back to triggering the action directly, so a
+ * genuinely unreachable row still fails.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} selector - what to right-click, see getRect
+ * @param {...string} path - row labels, outermost first
+ */
+export async function contextMenuAction(page, selector, ...path) {
+  if (path.length === 0) {
+    throw new Error('contextMenuAction needs at least one row to click');
+  }
+  const rect = await waitForClickable(page, selector);
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await mouseClick(page, rect.x + rect.width / 2, rect.y + rect.height / 2, {
+      button: 'right',
+    });
+    try {
+      for (const label of path.slice(0, -1)) {
+        await hover(page, `menu:${label}`);
+      }
+      await click(page, `menu:${path.at(-1)}`);
+      return;
+    } catch (error) {
+      lastError = error;
+      await page.keyboard.press('Escape');
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * Open a context menu and leave it showing, having hovered down to the last row
+ * of the path. Use this to screenshot a menu rather than act on it.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} selector - what to right-click, see getRect
+ * @param {...string} path - row labels to hover, outermost first
+ */
+export async function openContextMenu(page, selector, ...path) {
+  const rect = await waitForClickable(page, selector);
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await mouseClick(page, rect.x + rect.width / 2, rect.y + rect.height / 2, {
+      button: 'right',
+    });
+    try {
+      for (const label of path) {
+        await hover(page, `menu:${label}`);
+      }
+      return;
+    } catch (error) {
+      lastError = error;
+      await page.keyboard.press('Escape');
+    }
+  }
+  throw lastError;
+}
+
+/**
  * Trigger a menu action by objectName or visible text, without opening its
  * menu.
  *

@@ -14,10 +14,14 @@
  * still a clickable page coordinate. Such a widget is reached with a real mouse
  * event like anything else.
  *
- * Menus are the one exception, and sketcher_activate_action() exists for them
- * alone: Qt runs a nested event loop while a QToolButton's menu is open, which
- * under Asyncify suspends the WebAssembly stack and stops any call into the
- * module from completing until the menu closes. See that function for detail.
+ * A context menu behaves the same way: the sketcher shows one with
+ * QMenu::show() rather than exec(), so it does not run a nested event loop and
+ * its rows are located with a "menu:" selector and clicked for real.
+ *
+ * A QToolButton's menu is the one exception, and sketcher_activate_action()
+ * exists for it alone: Qt does run a nested event loop while such a menu is
+ * open, which under Asyncify suspends the WebAssembly stack and stops any call
+ * into the module from completing until the menu closes. See that function.
  *
  * Everything here is self-contained: the functions are registered with
  * JavaScript by the EMSCRIPTEN_BINDINGS block at the bottom, so no other
@@ -37,11 +41,13 @@
 #include <utility>
 
 #include <QAction>
+#include <QApplication>
 #include <QGraphicsItem>
 #include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMenu>
 #include <QPoint>
 #include <QRect>
 #include <QSize>
@@ -220,6 +226,64 @@ std::string item_rect(SketcherWidget& sketcher, const bool is_atom,
 }
 
 /**
+ * Resolve a row of one open QMenu, or "" if this menu has no matching row.
+ *
+ * Reading action geometry is only safe once the popup is actually visible; Qt
+ * has not laid the rows out before that, and on WASM touching a menu's
+ * internals mid-show aborts the runtime.
+ */
+std::string action_rect_in_menu(const QMenu& menu,
+                                const SketcherWidget& sketcher,
+                                const QString& name)
+{
+    if (!menu.isVisible()) {
+        return {};
+    }
+    const QString wanted = without_mnemonic(name);
+    for (auto* action : menu.actions()) {
+        if (action->objectName() != name &&
+            without_mnemonic(action->text()) != wanted) {
+            continue;
+        }
+        const QRect rect = menu.actionGeometry(action);
+        if (rect.isEmpty()) {
+            continue;
+        }
+        return rect_to_json(map_to_sketcher(menu, sketcher, rect.topLeft()),
+                            rect.size(), action->isEnabled());
+    }
+    return {};
+}
+
+/**
+ * Resolve a "menu:<objectName or text>" selector against whichever menus are
+ * open, or "{}" if none of them has a matching row.
+ *
+ * The active popup is tried first. With a submenu open Qt reports the deepest
+ * one, which is both the menu a human pointer event would reach next and the
+ * disambiguation this needs, since the same label can appear at more than one
+ * level of a nested menu.
+ */
+std::string menu_rect(SketcherWidget& sketcher, const std::string& value)
+{
+    const auto name = QString::fromStdString(value);
+    if (auto* active =
+            qobject_cast<QMenu*>(QApplication::activePopupWidget())) {
+        if (const auto result = action_rect_in_menu(*active, sketcher, name);
+            !result.empty()) {
+            return result;
+        }
+    }
+    for (auto* menu : sketcher.findChildren<QMenu*>()) {
+        if (const auto result = action_rect_in_menu(*menu, sketcher, name);
+            !result.empty()) {
+            return result;
+        }
+    }
+    return "{}";
+}
+
+/**
  * Trigger the QAction matching name_or_text, or return false if there is none.
  *
  * Actions are matched on objectName first and then on display text, since most
@@ -262,6 +326,11 @@ bool try_activate_action(SketcherWidget& sketcher, const QString& name)
  *   "widget:<objectName>"  a QWidget, by its Qt objectName
  *   "atom:<index>"         an atom of the current molecule, by model index
  *   "bond:<index>"         a bond of the current molecule, by model index
+ *   "menu:<name or text>"  a row of an open context menu, by objectName or text
+ *
+ * A "menu:" selector only resolves while the menu is on screen, so open the
+ * menu first. It does not reach a QToolButton's menu, which cannot be open and
+ * queried at the same time; use sketcher_activate_action() for those rows.
  *
  * Monomers are addressed as "atom" and monomer connectors as "bond", since the
  * model stores them as RDKit atoms and bonds. Every atom has a non-empty
@@ -293,9 +362,12 @@ std::string sketcher_get_rect(const std::string& selector)
     if (kind == "atom" || kind == "bond") {
         return item_rect(sketcher, kind == "atom", value);
     }
+    if (kind == "menu") {
+        return menu_rect(sketcher, value);
+    }
     throw std::runtime_error(
         "playwright test bridge: unrecognized selector kind '" + kind +
-        "' (expected 'widget', 'atom', or 'bond')");
+        "' (expected 'widget', 'atom', 'bond', or 'menu')");
 }
 
 /**
