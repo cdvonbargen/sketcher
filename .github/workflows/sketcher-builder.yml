@@ -42,6 +42,10 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 500M
+      CCACHE_KEY: ccache-${{ matrix.runner }}-${{ matrix.build-name }}
     strategy:
       fail-fast: false
       matrix:
@@ -90,6 +94,26 @@ jobs:
 
       - name: Determine build type
         run: echo BUILD_TYPE=${{ matrix.build-name == 'memtest' && 'Debug' || 'Release' }} >> "$GITHUB_ENV"
+
+      - name: Install ccache
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update && sudo apt-get install -y ccache
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew install ccache
+          else
+            choco install ccache --no-progress -y
+          fi
+
+      # ccache is only saved by builds of main (see "Save ccache" below), and
+      # its entries are keyed by the compiler inputs, so restoring a cache saved
+      # from a different commit is always safe
+      - name: Restore ccache
+        uses: actions/cache/restore@v5
+        with:
+          path: .ccache
+          key: ${{ env.CCACHE_KEY }}-${{ github.run_id }}
+          restore-keys: ${{ env.CCACHE_KEY }}-
 
       - name: Read external/versions.json
         run: |
@@ -247,11 +271,33 @@ jobs:
                 -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
                 -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON \
                 -DCMAKE_PREFIX_PATH="${{ env.CMAKE_PREFIX_PATH }}" \
+                -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
                 ${{ matrix.build-name == 'wasm' && '-DENABLE_TESTING=OFF' || '' }}
 
       - name: Build
         id: sketcher-build
-        run: cmake --build build --verbose --config ${{ env.BUILD_TYPE }}
+        run: |
+          ccache --zero-stats
+          cmake --build build --verbose --config ${{ env.BUILD_TYPE }}
+
+      - name: Show ccache statistics
+        if: always()
+        run: ccache --show-stats
+
+      # Only save from builds of main so that pull requests don't fill up the
+      # repository's cache storage. Pull requests can restore caches from main.
+      - name: Save ccache
+        # TEMPORARY: also save from pull requests to measure hit rates in #453
+        if: >-
+          steps.sketcher-build.outcome == 'success' &&
+          (github.event_name == 'pull_request' ||
+          (github.ref == 'refs/heads/main' &&
+          contains(fromJSON('["", "main", "refs/heads/main"]'), inputs.ref || '')))
+        uses: actions/cache/save@v5
+        with:
+          path: .ccache
+          key: ${{ env.CCACHE_KEY }}-${{ github.run_id }}
 
       - name: Run tests
         working-directory: build
